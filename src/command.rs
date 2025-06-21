@@ -1,5 +1,5 @@
 use is_executable::IsExecutable;
-use std::{env, path::Path, process};
+use std::{env, io::{self, Write}, path::Path, process};
 
 pub struct ExecutableCmd {
   cmd: String,
@@ -40,7 +40,7 @@ impl Cmd {
       Self::Exit => exec_exit(parts),
       Self::Echo => exec_echo(parts),
       Self::Type => exec_type(parts),
-      Self::Executable(_) => {}
+      Self::Executable(cmd) => exec_executable(cmd, parts),
       Self::Unknown => {}
     }
   }
@@ -96,5 +96,28 @@ fn exec_type(parts: Vec<&str>) {
       }
     }
     _ => println!("type: expected 1 arg"),
+  }
+}
+
+fn exec_executable(executable_cmd: &ExecutableCmd, parts: Vec<&str>) {
+  let command = std::process::Command::new(executable_cmd.cmd.clone())
+    .args(parts.iter().skip(1))
+    .spawn();
+
+  let output = match command {
+    Ok(child) => {
+      child.wait_with_output()
+    },
+    Err(_) => {
+      println!("{}: failed to execute", executable_cmd.cmd);
+      return;
+    },
+  };
+
+  match output {
+    Ok(output) => {
+      io::stdout().write_all(&output.stdout).unwrap();
+    }
+    Err(_) => println!("{}: failed to execute", executable_cmd.cmd),
   }
 }
