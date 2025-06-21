@@ -132,9 +132,20 @@ fn exec_executable(executable_cmd: &ExecutableCmd, parts: Vec<&str>) {
 }
 
 fn exec_cd(parts: Vec<&str>) {
-  match parts.as_slice() {
-    ["cd", path] => env::set_current_dir(path).unwrap(),
-    _ => println!("cd: expected 1 arg"),
+  let (path, cwd) = match parts.as_slice() {
+    // ["cd"] => ("~", ), 
+    ["cd", path] => (path, env::set_current_dir(path)),
+    _ => {
+      println!("cd: expected 1 arg at most");
+      return;
+    }
+  };
+
+  match cwd {
+    Ok(cwd) => cwd,
+    Err(_) => {
+      println!("cd: {}: No such file or directory", path);
+    }
   }
 }
 
@@ -143,7 +154,7 @@ fn exec_pwd(parts: Vec<&str>) {
     ["pwd"] => {
       let current_dir = env::current_dir().unwrap();
       println!("{}", current_dir.display());
-    },
-    _ => println!("pwd: expected 0 args")
+    }
+    _ => println!("pwd: expected 0 args"),
   }
 }
