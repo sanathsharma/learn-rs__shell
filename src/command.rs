@@ -132,9 +132,26 @@ fn exec_executable(executable_cmd: &ExecutableCmd, parts: Vec<&str>) {
 }
 
 fn exec_cd(parts: Vec<&str>) {
-  let (path, cwd) = match parts.as_slice() {
-    // ["cd"] => ("~", ), 
-    ["cd", path] => (path, env::set_current_dir(path)),
+  let (path, cwd): (&str, io::Result<()>) = match parts.as_slice() {
+    ["cd"] => {
+      if let Ok(home_path) = env::var("HOME") {
+        ("~", env::set_current_dir(home_path))
+      } else {
+        println!("cd: could not change dir to home");
+        return;
+      }
+    }
+    ["cd", path] => {
+      if path.starts_with("~") {
+        let new_path = match env::var("HOME") {
+          Ok(home_path) => path.replace("~", &home_path),
+          Err(_) => String::from(*path),
+        };
+        (path, env::set_current_dir(new_path))
+      } else {
+        (path, env::set_current_dir(path))
+      }
+    }
     _ => {
       println!("cd: expected 1 arg at most");
       return;
@@ -142,7 +159,7 @@ fn exec_cd(parts: Vec<&str>) {
   };
 
   match cwd {
-    Ok(cwd) => cwd,
+    Ok(_) => (),
     Err(_) => {
       println!("cd: {}: No such file or directory", path);
     }
