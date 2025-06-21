@@ -1,5 +1,10 @@
 use is_executable::IsExecutable;
-use std::{env, io::{self, Write}, path::Path, process};
+use std::{
+  env,
+  io::{self, Write},
+  path::Path,
+  process,
+};
 
 pub struct ExecutableCmd {
   cmd: String,
@@ -11,6 +16,8 @@ pub enum Cmd {
   Echo,
   Type,
   Executable(ExecutableCmd),
+  Cd,
+  Pwd,
   Unknown,
 }
 
@@ -20,6 +27,8 @@ impl From<&str> for Cmd {
       "echo" => Cmd::Echo,
       "exit" => Cmd::Exit,
       "type" => Cmd::Type,
+      "pwd" => Cmd::Pwd,
+      "cd" => Cmd::Cd,
       cmd => {
         if let Some(executable_path) = find_command(cmd) {
           return Cmd::Executable(ExecutableCmd {
@@ -41,6 +50,8 @@ impl Cmd {
       Self::Echo => exec_echo(parts),
       Self::Type => exec_type(parts),
       Self::Executable(cmd) => exec_executable(cmd, parts),
+      Self::Cd => exec_cd(parts),
+      Self::Pwd => exec_pwd(parts),
       Self::Unknown => {}
     }
   }
@@ -105,13 +116,11 @@ fn exec_executable(executable_cmd: &ExecutableCmd, parts: Vec<&str>) {
     .spawn();
 
   let output = match command {
-    Ok(child) => {
-      child.wait_with_output()
-    },
+    Ok(child) => child.wait_with_output(),
     Err(_) => {
       println!("{}: failed to execute", executable_cmd.cmd);
       return;
-    },
+    }
   };
 
   match output {
@@ -119,5 +128,22 @@ fn exec_executable(executable_cmd: &ExecutableCmd, parts: Vec<&str>) {
       io::stdout().write_all(&output.stdout).unwrap();
     }
     Err(_) => println!("{}: failed to execute", executable_cmd.cmd),
+  }
+}
+
+fn exec_cd(parts: Vec<&str>) {
+  match parts.as_slice() {
+    ["cd", path] => env::set_current_dir(path).unwrap(),
+    _ => println!("cd: expected 1 arg"),
+  }
+}
+
+fn exec_pwd(parts: Vec<&str>) {
+  match parts.as_slice() {
+    ["pwd"] => {
+      let current_dir = env::current_dir().unwrap();
+      println!("{}", current_dir.display());
+    },
+    _ => println!("pwd: expected 0 args")
   }
 }
