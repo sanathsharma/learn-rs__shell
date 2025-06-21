@@ -1,30 +1,46 @@
-use std::{env, path::Path, process};
 use is_executable::IsExecutable;
+use std::{env, path::Path, process};
 
-pub enum Builtin {
+pub struct ExecutableCmd {
+  cmd: String,
+  path: String,
+}
+
+pub enum Cmd {
   Exit,
   Echo,
   Type,
+  Executable(ExecutableCmd),
   Unknown,
 }
 
-impl From<&str> for Builtin {
+impl From<&str> for Cmd {
   fn from(value: &str) -> Self {
     match value {
-      "echo" => Builtin::Echo,
-      "exit" => Builtin::Exit,
-      "type" => Builtin::Type,
-      _ => Builtin::Unknown,
+      "echo" => Cmd::Echo,
+      "exit" => Cmd::Exit,
+      "type" => Cmd::Type,
+      cmd => {
+        if let Some(executable_path) = find_command(cmd) {
+          return Cmd::Executable(ExecutableCmd {
+            cmd: cmd.to_string(),
+            path: executable_path,
+          });
+        };
+
+        Cmd::Unknown
+      }
     }
   }
 }
 
-impl Builtin {
+impl Cmd {
   pub fn exec(&self, parts: Vec<&str>) {
     match self {
       Self::Exit => exec_exit(parts),
       Self::Echo => exec_echo(parts),
       Self::Type => exec_type(parts),
+      Self::Executable(_) => {}
       Self::Unknown => {}
     }
   }
@@ -61,7 +77,7 @@ fn find_command(command: &str) -> Option<String> {
     let executable_path_str = format!("{}/{}", dir, command);
 
     let executable_path = Path::new(executable_path_str.as_str());
-    if executable_path.exists() && executable_path.is_executable()  {
+    if executable_path.exists() && executable_path.is_executable() {
       return Some(executable_path_str);
     };
   }
@@ -72,15 +88,10 @@ fn find_command(command: &str) -> Option<String> {
 fn exec_type(parts: Vec<&str>) {
   match parts.as_slice() {
     ["type", command] => {
-      let builtin = Builtin::from(*command);
+      let builtin = Cmd::from(*command);
       match builtin {
-        Builtin::Unknown => {
-          if let Some(executable_path) = find_command(command) {
-            println!("{} is {}", command, executable_path);
-            return;
-          };
-          println!("{}: not found", command);
-        }
+        Cmd::Unknown => println!("{}: not found", command),
+        Cmd::Executable(exe) => println!("{} is {}", exe.cmd, exe.path),
         _ => println!("{} is a shell builtin", command),
       }
     }

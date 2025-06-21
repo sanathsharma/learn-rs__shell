@@ -1,9 +1,9 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
-use builtin::Builtin;
+use command::Cmd;
 
-mod builtin;
+mod command;
 
 fn main() {
   loop {
@@ -14,14 +14,14 @@ fn main() {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     let parts = input.trim().split_whitespace().collect::<Vec<&str>>();
-    match Builtin::from(parts[0]) {
-      Builtin::Unknown => {}
-      builtin => {
-        builtin.exec(parts);
+    match Cmd::from(parts[0]) {
+      Cmd::Unknown => {
+        println!("{}: command not found", input.trim());
+      }
+      command => {
+        command.exec(parts);
         continue;
       }
     }
-
-    println!("{}: command not found", input.trim());
   }
 }
