@@ -1,9 +1,12 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
+use args::parse_args;
 use command::Cmd;
 
 mod command;
+mod utils;
+mod args;
 
 fn main() {
   loop {
@@ -13,13 +16,16 @@ fn main() {
     // Wait for user input
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    let parts = input.trim().split_whitespace().collect::<Vec<&str>>();
-    match Cmd::from(parts[0]) {
+
+    let args = parse_args(input.trim().to_string());
+    let args = args.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+
+    match Cmd::from(args[0]) {
       Cmd::Unknown => {
         println!("{}: command not found", input.trim());
       }
       command => {
-        command.exec(parts);
+        command.exec(args);
         continue;
       }
     }

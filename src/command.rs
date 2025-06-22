@@ -1,10 +1,10 @@
-use is_executable::IsExecutable;
 use std::{
   env,
   io::{self, Write},
-  path::Path,
   process,
 };
+
+use crate::utils::{expand_tilda, find_command};
 
 pub struct ExecutableCmd {
   cmd: String,
@@ -76,26 +76,6 @@ fn exec_echo(parts: Vec<&str>) {
   println!("{}", args);
 }
 
-fn find_command(command: &str) -> Option<String> {
-  let path = match env::var("PATH") {
-    Ok(path) => path,
-    Err(_) => {
-      return None;
-    }
-  };
-
-  for dir in path.split(":") {
-    let executable_path_str = format!("{}/{}", dir, command);
-
-    let executable_path = Path::new(executable_path_str.as_str());
-    if executable_path.exists() && executable_path.is_executable() {
-      return Some(executable_path_str);
-    };
-  }
-
-  None
-}
-
 fn exec_type(parts: Vec<&str>) {
   match parts.as_slice() {
     ["type", command] => {
@@ -133,21 +113,10 @@ fn exec_executable(executable_cmd: &ExecutableCmd, parts: Vec<&str>) {
 
 fn exec_cd(parts: Vec<&str>) {
   let (path, cwd): (&str, io::Result<()>) = match parts.as_slice() {
-    ["cd"] => {
-      if let Ok(home_path) = env::var("HOME") {
-        ("~", env::set_current_dir(home_path))
-      } else {
-        println!("cd: could not change dir to home");
-        return;
-      }
-    }
+    ["cd"] => ("~", env::set_current_dir(expand_tilda(&"~"))),
     ["cd", path] => {
       if path.starts_with("~") {
-        let new_path = match env::var("HOME") {
-          Ok(home_path) => path.replace("~", &home_path),
-          Err(_) => String::from(*path),
-        };
-        (path, env::set_current_dir(new_path))
+        (path, env::set_current_dir(expand_tilda(path)))
       } else {
         (path, env::set_current_dir(path))
       }
