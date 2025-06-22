@@ -3,6 +3,12 @@ const SINGLE_QUOTE: char = '\'';
 const DOUBLE_QUOTE: char = '\"';
 const ESCAPE: char = '\\';
 
+pub enum WaitFor {
+  Space,
+  SingleQuote,
+  DoubleQuote,
+}
+
 /// Parses a command line string into individual arguments, handling single-quoted strings.
 ///
 /// This function splits the input string on spaces while preserving quoted arguments.
@@ -17,20 +23,28 @@ pub fn parse_args(full_command: String) -> Vec<String> {
   let mut args: Vec<String> = Vec::new();
   let mut arg = String::new();
   // Wait for this char while appending other characters to arg
-  let mut wait_for = SPACE; // SPACE | SINGLE_QUOTE | DOUBLE_QUOTE
+  let mut wait_for = WaitFor::Space;
   let mut is_escaping = false;
 
   for char in full_command.chars() {
     if is_escaping {
       match wait_for {
         // Escaping outside quotes (non-quoted backlash, preserves the literal value of next char)
-        SPACE => {
+        WaitFor::Space => {
           arg.push(char);
         }
-        _ => {
-          // keep escape and next char for now
+        // with single quotes, every char is treaded literally and no escaping is performed
+        WaitFor::SingleQuote => {
           arg.push(ESCAPE);
           arg.push(char);
+        }
+        WaitFor::DoubleQuote => {
+          match char {
+            ESCAPE | DOUBLE_QUOTE => {
+              arg.push(char)
+            }
+            _ => {}
+          }
         }
       }
       is_escaping = false;
@@ -39,39 +53,41 @@ pub fn parse_args(full_command: String) -> Vec<String> {
 
     match char {
       SPACE => {
-        // If we're inside single quotes, treat space as a regular character
-        if wait_for != SPACE {
-          arg.push(SPACE);
-          continue;
+        match wait_for {
+          WaitFor::Space => {
+            // Skip consecutive spaces
+            if arg.is_empty() {
+              continue;
+            }
+            // End of current argument - add it to the list
+            args.push(arg.clone());
+            arg.clear();
+          }
+          // If we're inside quotes, treat space as a regular character
+          WaitFor::SingleQuote | WaitFor::DoubleQuote => {
+            arg.push(SPACE);
+            continue;
+          }
         }
-        // Skip consecutive spaces
-        if arg.is_empty() {
-          continue;
-        }
-        // End of current argument - add it to the list
-        args.push(arg.clone());
-        arg.clear();
       }
       SINGLE_QUOTE => {
         match wait_for {
           // Start of quoted string - begin collecting characters until closing quote
-          SPACE => wait_for = SINGLE_QUOTE,
+          WaitFor::Space => wait_for = WaitFor::SingleQuote,
           // End of quoted string - change the wait_for to space. push arg to args only on space
-          SINGLE_QUOTE => wait_for = SPACE,
+          WaitFor::SingleQuote => wait_for = WaitFor::Space,
           // In between double quotes - add it to the current argument
-          DOUBLE_QUOTE => arg.push(SINGLE_QUOTE),
-          _ => {}
+          WaitFor::DoubleQuote => arg.push(SINGLE_QUOTE),
         }
       }
       DOUBLE_QUOTE => {
         match wait_for {
           // Start of quoted string - begin collecting characters until closing quote
-          SPACE => wait_for = DOUBLE_QUOTE,
+          WaitFor::Space => wait_for = WaitFor::DoubleQuote,
           // End of quoted string - change the wait_for to space. push arg to args only on space
-          DOUBLE_QUOTE => wait_for = SPACE,
+          WaitFor::DoubleQuote => wait_for = WaitFor::Space,
           // In between single quotes - add it to the current argument
-          SINGLE_QUOTE => arg.push(SINGLE_QUOTE),
-          _ => {}
+          WaitFor::SingleQuote => arg.push(DOUBLE_QUOTE),
         }
       }
       ESCAPE => is_escaping = true,
