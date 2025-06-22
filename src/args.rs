@@ -39,9 +39,7 @@ pub fn parse_args(full_command: String) -> Vec<String> {
           continue;
         }
 
-        // End of quoted string - add the argument and reset state
-        args.push(arg.clone());
-        arg.clear();
+        // End of quoted string - change the wait_for to space. push arg to args only on space
         wait_for = SPACE;
       }
       // Regular character - add it to the current argument
