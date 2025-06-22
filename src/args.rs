@@ -1,6 +1,7 @@
 const SPACE: char = ' ';
 const SINGLE_QUOTE: char = '\'';
 const DOUBLE_QUOTE: char = '\"';
+const ESCAPE: char = '\\';
 
 /// Parses a command line string into individual arguments, handling single-quoted strings.
 ///
@@ -15,9 +16,17 @@ const DOUBLE_QUOTE: char = '\"';
 pub fn parse_args(full_command: String) -> Vec<String> {
   let mut args: Vec<String> = Vec::new();
   let mut arg = String::new();
+  // Wait for this char while appending other characters to arg
   let mut wait_for = SPACE;
+  let mut is_escaping = false;
 
   for char in full_command.chars() {
+    if is_escaping {
+      arg.push(char);
+      is_escaping = false;
+      continue;
+    }
+
     match char {
       SPACE => {
         // If we're inside single quotes, treat space as a regular character
@@ -55,6 +64,7 @@ pub fn parse_args(full_command: String) -> Vec<String> {
           _ => {}
         }
       }
+      ESCAPE => is_escaping = true,
       // Regular character - add it to the current argument
       ch => arg.push(ch),
     }
