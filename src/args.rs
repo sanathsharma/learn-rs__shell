@@ -17,12 +17,22 @@ pub fn parse_args(full_command: String) -> Vec<String> {
   let mut args: Vec<String> = Vec::new();
   let mut arg = String::new();
   // Wait for this char while appending other characters to arg
-  let mut wait_for = SPACE;
+  let mut wait_for = SPACE; // SPACE | SINGLE_QUOTE | DOUBLE_QUOTE
   let mut is_escaping = false;
 
   for char in full_command.chars() {
     if is_escaping {
-      arg.push(char);
+      match wait_for {
+        // Escaping outside quotes (non-quoted backlash, preserves the literal value of next char)
+        SPACE => {
+          arg.push(char);
+        }
+        _ => {
+          // keep escape and next char for now
+          arg.push(ESCAPE);
+          arg.push(char);
+        }
+      }
       is_escaping = false;
       continue;
     }
