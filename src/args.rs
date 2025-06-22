@@ -38,14 +38,14 @@ pub fn parse_args(full_command: String) -> Vec<String> {
           arg.push(ESCAPE);
           arg.push(char);
         }
-        WaitFor::DoubleQuote => {
-          match char {
-            ESCAPE | DOUBLE_QUOTE => {
-              arg.push(char)
-            }
-            _ => {}
+        WaitFor::DoubleQuote => match char {
+          ESCAPE | DOUBLE_QUOTE => arg.push(char),
+          // with double quotes, every char other the selected few is treaded literally and no escaping is performed
+          _ => {
+            arg.push(ESCAPE);
+            arg.push(char);
           }
-        }
+        },
       }
       is_escaping = false;
       continue;
