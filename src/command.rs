@@ -1,7 +1,7 @@
 use std::{
   env,
   io::{self},
-  process,
+  process::{self, Stdio},
 };
 
 use crate::{
@@ -118,6 +118,10 @@ fn exec_executable(executable_cmd: &ExecutableCmd, cmd_args: CmdArgs, writer: Cm
 
   let command = std::process::Command::new(executable_cmd.cmd.clone())
     .args(args.iter().skip(1))
+    // INFO: Stdio::piped makes the child not write it to stdout & stderr that is inherited from the
+    // terminal session
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
     .spawn();
 
   let output = match command {
