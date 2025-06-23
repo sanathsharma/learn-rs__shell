@@ -23,16 +23,25 @@ impl CmdArgs {
           "1>" | ">" => {
             redirection = Redirection::Stdout {
               file_path: args_iter.next().unwrap().clone(),
+              append: false,
             };
           }
           "2>" => {
             redirection = Redirection::Stderr {
               file_path: args_iter.next().unwrap().clone(),
+              append: false,
             }
           }
-          "&>" => {
-            redirection = Redirection::Any {
+          "1>>" | ">>" => {
+            redirection = Redirection::Stdout {
               file_path: args_iter.next().unwrap().clone(),
+              append: true,
+            };
+          }
+          "2>>" => {
+            redirection = Redirection::Stderr {
+              file_path: args_iter.next().unwrap().clone(),
+              append: true,
             }
           }
           _ => {
