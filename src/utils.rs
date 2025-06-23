@@ -1,5 +1,5 @@
-use std::{env, path::Path};
 use is_executable::IsExecutable;
+use std::{env, path::Path};
 
 pub fn find_command(command: &str) -> Option<String> {
   let path = match env::var("PATH") {

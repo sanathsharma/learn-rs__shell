@@ -3,6 +3,54 @@ const SINGLE_QUOTE: char = '\'';
 const DOUBLE_QUOTE: char = '\"';
 const ESCAPE: char = '\\';
 
+use crate::writer::Redirection;
+
+#[derive(Debug)]
+pub struct CmdArgs {
+  pub args: Vec<String>,
+  pub redirection: Redirection,
+}
+
+impl CmdArgs {
+  pub fn from_args_vec(args: &Vec<String>) -> Self {
+    let mut args_iter = args.iter();
+    let mut final_args: Vec<String> = Vec::new();
+    let mut redirection = Redirection::None;
+    loop {
+      let current = args_iter.next();
+      if let Some(current) = current {
+        match current.as_str() {
+          "1>" | ">" => {
+            redirection = Redirection::Stdout {
+              file_path: args_iter.next().unwrap().clone(),
+            };
+          }
+          "2>" => {
+            redirection = Redirection::Stderr {
+              file_path: args_iter.next().unwrap().clone(),
+            }
+          }
+          "&>" => {
+            redirection = Redirection::Any {
+              file_path: args_iter.next().unwrap().clone(),
+            }
+          }
+          _ => {
+            final_args.push(current.clone());
+          }
+        }
+      } else {
+        break;
+      }
+    }
+
+    CmdArgs {
+      args: final_args,
+      redirection,
+    }
+  }
+}
+
 pub enum WaitFor {
   Space,
   SingleQuote,
@@ -19,7 +67,7 @@ pub enum WaitFor {
 ///
 /// # Returns
 /// A vector of strings, where each string is a separate command argument
-pub fn parse_args(full_command: String) -> Vec<String> {
+pub fn parse_args(full_command: String) -> CmdArgs {
   let mut args: Vec<String> = Vec::new();
   let mut arg = String::new();
   // Wait for this char while appending other characters to arg
@@ -100,5 +148,5 @@ pub fn parse_args(full_command: String) -> Vec<String> {
     args.push(arg);
   }
 
-  args
+  CmdArgs::from_args_vec(&args)
 }

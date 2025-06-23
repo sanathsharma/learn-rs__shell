@@ -1,12 +1,15 @@
+// Bash impl docs, see https://www.gnu.org/software/bash/manual/bash.html#Redirecting-Output
+
 #[allow(unused_imports)]
 use std::io::{self, Write};
 
 use args::parse_args;
 use command::Cmd;
 
+mod args;
 mod command;
 mod utils;
-mod args;
+mod writer;
 
 fn main() {
   loop {
@@ -17,15 +20,15 @@ fn main() {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
 
-    let args = parse_args(input.trim().to_string());
-    let args = args.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+    let cmd_args = parse_args(input.trim().to_string());
+    // println!(">>> args: {:?}", cmd_args);
 
-    match Cmd::from(args[0]) {
+    match Cmd::from(cmd_args.args[0].clone()) {
       Cmd::Unknown => {
         println!("{}: command not found", input.trim());
       }
       command => {
-        command.exec(args);
+        command.exec(cmd_args);
         continue;
       }
     }

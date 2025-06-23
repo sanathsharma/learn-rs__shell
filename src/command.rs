@@ -1,13 +1,17 @@
 use std::{
   env,
-  io::{self, Write},
+  io::{self},
   process,
 };
 
-use crate::utils::{expand_tilda, find_command};
-
+use crate::{
+  args::CmdArgs,
+  utils::{expand_tilda, find_command},
+  writer::CmdOuputWriter,
+};
 pub struct ExecutableCmd {
   cmd: String,
+
   path: String,
 }
 
@@ -21,9 +25,9 @@ pub enum Cmd {
   Unknown,
 }
 
-impl From<&str> for Cmd {
-  fn from(value: &str) -> Self {
-    match value {
+impl From<String> for Cmd {
+  fn from(value: String) -> Self {
+    match value.as_str() {
       "echo" => Cmd::Echo,
       "exit" => Cmd::Exit,
       "type" => Cmd::Type,
@@ -32,7 +36,8 @@ impl From<&str> for Cmd {
       cmd => {
         if let Some(executable_path) = find_command(cmd) {
           return Cmd::Executable(ExecutableCmd {
-            cmd: cmd.to_string(),
+            // avoid conversion from cmd.to_string(), by passing value
+            cmd: value,
             path: executable_path,
           });
         };
@@ -44,75 +49,108 @@ impl From<&str> for Cmd {
 }
 
 impl Cmd {
-  pub fn exec(&self, parts: Vec<&str>) {
+  pub fn exec(&self, cmd_args: CmdArgs) {
+    let writer = CmdOuputWriter::new(cmd_args.redirection.clone());
+
     match self {
-      Self::Exit => exec_exit(parts),
-      Self::Echo => exec_echo(parts),
-      Self::Type => exec_type(parts),
-      Self::Executable(cmd) => exec_executable(cmd, parts),
-      Self::Cd => exec_cd(parts),
-      Self::Pwd => exec_pwd(parts),
+      Self::Exit => exec_exit(cmd_args, writer),
+      Self::Echo => exec_echo(cmd_args, writer),
+      Self::Type => exec_type(cmd_args, writer),
+      Self::Executable(cmd) => exec_executable(cmd, cmd_args, writer),
+      Self::Cd => exec_cd(cmd_args, writer),
+      Self::Pwd => exec_pwd(cmd_args, writer),
       Self::Unknown => {}
     }
   }
 }
 
-fn exec_exit(parts: Vec<&str>) {
-  match parts.as_slice() {
+fn exec_exit(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+  let args = cmd_args
+    .args
+    .iter()
+    .map(|arg| arg.as_str())
+    .collect::<Vec<&str>>();
+
+  match args.as_slice() {
     ["exit"] => process::exit(255),
     ["exit", code] => {
       if let Ok(code) = code.parse::<u8>() {
         process::exit(code.into());
       }
 
-      println!("exit: invalid code");
+      writer.output_error_string("exit: invalid code");
     }
-    _ => println!("exit: expected 1 arg at most"),
+    _ => writer.output_error_string("exit: expected 1 arg at most"),
   }
 }
 
-fn exec_echo(parts: Vec<&str>) {
-  let args = &parts[1..].join(" ");
-  println!("{}", args);
+fn exec_echo(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+  let args = &cmd_args.args[1..].join(" ");
+  writer.output_string(args);
 }
 
-fn exec_type(parts: Vec<&str>) {
-  match parts.as_slice() {
+fn exec_type(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+  let args = cmd_args
+    .args
+    .iter()
+    .map(|arg| arg.as_str())
+    .collect::<Vec<&str>>();
+
+  match args.as_slice() {
     ["type", command] => {
-      let builtin = Cmd::from(*command);
+      let builtin = Cmd::from(command.to_string());
       match builtin {
-        Cmd::Unknown => println!("{}: not found", command),
-        Cmd::Executable(exe) => println!("{} is {}", exe.cmd, exe.path),
-        _ => println!("{} is a shell builtin", command),
+        Cmd::Unknown => writer.output_error_string(format!("{}: not found", command)),
+        Cmd::Executable(exe) => writer.output_string(format!("{} is {}", exe.cmd, exe.path)),
+        _ => writer.output_string(format!("{} is a shell builtin", command)),
       }
     }
-    _ => println!("type: expected 1 arg"),
+    _ => writer.output_error_string("type: expected 1 arg"),
   }
 }
 
-fn exec_executable(executable_cmd: &ExecutableCmd, parts: Vec<&str>) {
+fn exec_executable(executable_cmd: &ExecutableCmd, cmd_args: CmdArgs, writer: CmdOuputWriter) {
+  let args = cmd_args
+    .args
+    .iter()
+    .map(|arg| arg.as_str())
+    .collect::<Vec<&str>>();
+
   let command = std::process::Command::new(executable_cmd.cmd.clone())
-    .args(parts.iter().skip(1))
+    .args(args.iter().skip(1))
     .spawn();
 
   let output = match command {
     Ok(child) => child.wait_with_output(),
     Err(_) => {
-      println!("{}: failed to execute", executable_cmd.cmd);
+      writer.output_error_string(format!("{}: failed to execute", executable_cmd.cmd));
       return;
     }
   };
 
   match output {
     Ok(output) => {
-      io::stdout().write_all(&output.stdout).unwrap();
+      if !output.stdout.is_empty() {
+        writer.output(&output.stdout);
+        return;
+      }
+
+      if !output.stderr.is_empty() {
+        writer.output_error(&output.stderr);
+      }
     }
-    Err(_) => println!("{}: failed to execute", executable_cmd.cmd),
+    Err(_) => writer.output_error_string(format!("{}: failed to execute", executable_cmd.cmd)),
   }
 }
 
-fn exec_cd(parts: Vec<&str>) {
-  let (path, cwd): (&str, io::Result<()>) = match parts.as_slice() {
+fn exec_cd(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+  let args = cmd_args
+    .args
+    .iter()
+    .map(|arg| arg.as_str())
+    .collect::<Vec<&str>>();
+
+  let (path, cwd): (&str, io::Result<()>) = match args.as_slice() {
     ["cd"] => ("~", env::set_current_dir(expand_tilda(&"~"))),
     ["cd", path] => {
       if path.starts_with("~") {
@@ -122,7 +160,7 @@ fn exec_cd(parts: Vec<&str>) {
       }
     }
     _ => {
-      println!("cd: expected 1 arg at most");
+      writer.output_error_string("cd: expected 1 arg at most");
       return;
     }
   };
@@ -130,17 +168,23 @@ fn exec_cd(parts: Vec<&str>) {
   match cwd {
     Ok(_) => (),
     Err(_) => {
-      println!("cd: {}: No such file or directory", path);
+      writer.output_error_string(format!("cd: {}: No such file or directory", path));
     }
   }
 }
 
-fn exec_pwd(parts: Vec<&str>) {
-  match parts.as_slice() {
+fn exec_pwd(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+  let args = cmd_args
+    .args
+    .iter()
+    .map(|arg| arg.as_str())
+    .collect::<Vec<&str>>();
+
+  match args.as_slice() {
     ["pwd"] => {
       let current_dir = env::current_dir().unwrap();
-      println!("{}", current_dir.display());
+      writer.output_string(format!("{}", current_dir.display()));
     }
-    _ => println!("pwd: expected 0 args"),
+    _ => writer.output_error_string("pwd: expected 0 args"),
   }
 }
