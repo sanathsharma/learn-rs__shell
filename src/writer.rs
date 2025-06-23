@@ -42,6 +42,10 @@ impl CmdOuputWriter {
         }
       }
       _ => {
+        if buf.ends_with(b"\n") {
+          print!("{}", String::from_utf8_lossy(buf));
+          return;
+        }
         println!("{}", String::from_utf8_lossy(buf));
       }
     }
