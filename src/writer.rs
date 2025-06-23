@@ -1,4 +1,7 @@
-use std::{fs::OpenOptions, io::Write};
+use std::{
+  fs::{File, OpenOptions},
+  io::Write,
+};
 
 #[derive(Debug, Clone)]
 pub enum Redirection {
@@ -25,6 +28,17 @@ impl CmdOuputWriter {
 
 impl CmdOuputWriter {
   pub fn output(&self, buf: &[u8]) {
+    let print_to_stdout = || {
+      if buf.is_empty() {
+        return;
+      }
+      if buf.ends_with(b"\n") {
+        print!("{}", String::from_utf8_lossy(buf));
+        return;
+      }
+      println!("{}", String::from_utf8_lossy(buf));
+    };
+
     match self.redirection.clone() {
       Redirection::Stdout { file_path } | Redirection::Any { file_path } => {
         let file = OpenOptions::new().write(true).create(true).open(&file_path);
@@ -41,13 +55,11 @@ impl CmdOuputWriter {
           Err(_) => eprintln!("Error writing to {}", file_path),
         }
       }
-      _ => {
-        if buf.ends_with(b"\n") {
-          print!("{}", String::from_utf8_lossy(buf));
-          return;
-        }
-        println!("{}", String::from_utf8_lossy(buf));
+      Redirection::Stderr { file_path } => {
+        print_to_stdout();
+        let _ = OpenOptions::new().create(true).write(true).open(&file_path);
       }
+      Redirection::None => print_to_stdout(),
     }
   }
 
@@ -69,7 +81,11 @@ impl CmdOuputWriter {
           Err(_) => eprintln!("Error writing to {}", file_path),
         }
       }
-      _ => {
+      Redirection::Stderr { file_path } => {
+        println!("{}", string);
+        let _ = OpenOptions::new().create(true).write(true).open(&file_path);
+      }
+      Redirection::None => {
         println!("{}", string);
       }
     }
@@ -92,6 +108,9 @@ impl CmdOuputWriter {
         }
       }
       _ => {
+        if buf.is_empty() {
+          return;
+        }
         if buf.ends_with(b"\n") {
           eprint!("{}", String::from_utf8_lossy(buf));
           return;
