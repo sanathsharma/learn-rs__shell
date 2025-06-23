@@ -121,6 +121,17 @@ impl CmdOuputWriter {
     }
   }
   pub fn output_error(&self, buf: &[u8]) {
+    let print_to_stderr = || {
+      if buf.is_empty() {
+        return;
+      }
+      if buf.ends_with(b"\n") {
+        eprint!("{}", String::from_utf8_lossy(buf));
+        return;
+      }
+      eprintln!("{}", String::from_utf8_lossy(buf));
+    };
+
     match self.redirection.clone() {
       Redirection::Stderr { file_path, append } => {
         let file = OpenOptions::new()
@@ -142,16 +153,15 @@ impl CmdOuputWriter {
           Err(_) => eprintln!("Error writing to {}", file_path),
         }
       }
-      _ => {
-        if buf.is_empty() {
-          return;
-        }
-        if buf.ends_with(b"\n") {
-          eprint!("{}", String::from_utf8_lossy(buf));
-          return;
-        }
-        eprintln!("{}", String::from_utf8_lossy(buf));
+      Redirection::Stdout { file_path, append } => {
+        print_to_stderr();
+        let _ = OpenOptions::new()
+          .create(true)
+          .append(append)
+          .write(true)
+          .open(&file_path);
       }
+      Redirection::None => {}
     }
   }
 
@@ -178,7 +188,15 @@ impl CmdOuputWriter {
           Err(_) => eprintln!("Error writing to {}", file_path),
         }
       }
-      _ => {
+      Redirection::Stdout { file_path, append } => {
+        eprintln!("{}", string);
+        let _ = OpenOptions::new()
+          .create(true)
+          .append(append)
+          .write(true)
+          .open(&file_path);
+      }
+      Redirection::None => {
         eprintln!("{}", string);
       }
     }
