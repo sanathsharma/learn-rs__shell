@@ -136,7 +136,6 @@ fn exec_executable(executable_cmd: &ExecutableCmd, cmd_args: CmdArgs, writer: Cm
     Ok(output) => {
       if !output.stdout.is_empty() {
         writer.output(&output.stdout);
-        return;
       }
 
       if !output.stderr.is_empty() {

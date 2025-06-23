@@ -24,8 +24,8 @@ impl CmdOuputWriter {
 }
 
 impl CmdOuputWriter {
-  pub fn output(self, buf: &[u8]) {
-    match self.redirection {
+  pub fn output(&self, buf: &[u8]) {
+    match self.redirection.clone() {
       Redirection::Stdout { file_path } | Redirection::Any { file_path } => {
         let file = OpenOptions::new().write(true).create(true).open(&file_path);
         let write = match file {
@@ -51,9 +51,9 @@ impl CmdOuputWriter {
     }
   }
 
-  pub fn output_string<T: AsRef<str>>(self, string: T) {
+  pub fn output_string<T: AsRef<str>>(&self, string: T) {
     let string = string.as_ref();
-    match self.redirection {
+    match self.redirection.clone() {
       Redirection::Stdout { file_path } | Redirection::Any { file_path } => {
         let file = OpenOptions::new().write(true).create(true).open(&file_path);
         let write = match file {
@@ -74,8 +74,8 @@ impl CmdOuputWriter {
       }
     }
   }
-  pub fn output_error(self, buf: &[u8]) {
-    match self.redirection {
+  pub fn output_error(&self, buf: &[u8]) {
+    match self.redirection.clone() {
       Redirection::Stderr { file_path } | Redirection::Any { file_path } => {
         let file = OpenOptions::new().write(true).create(true).open(&file_path);
         let write = match file {
@@ -92,14 +92,18 @@ impl CmdOuputWriter {
         }
       }
       _ => {
+        if buf.ends_with(b"\n") {
+          eprint!("{}", String::from_utf8_lossy(buf));
+          return;
+        }
         eprintln!("{}", String::from_utf8_lossy(buf));
       }
     }
   }
 
-  pub fn output_error_string<T: AsRef<str>>(self, string: T) {
+  pub fn output_error_string<T: AsRef<str>>(&self, string: T) {
     let string = string.as_ref();
-    match self.redirection {
+    match self.redirection.clone() {
       Redirection::Stderr { file_path } | Redirection::Any { file_path } => {
         let file = OpenOptions::new().write(true).create(true).open(&file_path);
         let write = match file {
