@@ -76,6 +76,7 @@ fn read_input(completions: &mut Trie) -> Result<Option<String>> {
 
           input.clear();
           input.extend(bytes);
+          input.extend(b" ");
           continue;
         }
       }
