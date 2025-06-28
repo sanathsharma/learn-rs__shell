@@ -17,6 +17,7 @@ mod ansi_codes;
 
 pub use error::Result;
 use ansi_codes::AnsiCode;
+use crate::utils::find_all_executables;
 
 fn main() -> Result<()> {
   loop {
@@ -51,6 +52,11 @@ fn setup_completions() -> Trie {
   let mut completions = Trie::new();
   completions.insert("echo");
   completions.insert("exit");
+  completions.insert("type");
+  
+  for executable in find_all_executables() {
+    completions.insert(&executable);
+  }
 
   completions
 }
