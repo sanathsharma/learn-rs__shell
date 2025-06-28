@@ -77,6 +77,10 @@ impl Trie {
     true
   }
 
+  /// Given a prefix, return a vector of all words that start with that prefix.
+  ///
+  /// If the prefix is empty, return an empty vector.
+  /// Returned Vector of strings is not sorted.
   pub fn get_completions<T: AsRef<str>>(&mut self, prefix: T) -> Vec<String> {
     let str = prefix.as_ref();
     if str.is_empty() {
