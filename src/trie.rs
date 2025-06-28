@@ -112,6 +112,96 @@ impl Trie {
       Self::collect_words(child, &format!("{}{}", prefix, char), completions);
     }
   }
+
+  /// Finds the longest common prefix path starting from a given prefix.
+  ///
+  /// This function takes a prefix string and finds the longest unambiguous path in the trie
+  /// that extends from this prefix. It's useful for autocomplete and suggestion features.
+  ///
+  /// # Arguments
+  ///
+  /// * `prefix` - A string-like type that can be converted to a string reference.
+  ///   This is the starting point for finding the longest common prefix.
+  ///
+  /// # Returns
+  ///
+  /// * A `String` containing the longest common prefix path.
+  ///   - If the prefix doesn't exist in the trie, returns an empty string.
+  ///   - If there are multiple possible paths from the prefix, returns the prefix itself.
+  ///   - If there's only one possible path, returns the full path to either a leaf node
+  ///     or to a node where branching occurs.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// let mut trie = Trie::new();
+  /// trie.insert("apple");
+  /// trie.insert("application");
+  ///
+  /// assert_eq!(trie.longest_common_prefix("app"), "app"); // Multiple paths from "app"
+  /// assert_eq!(trie.longest_common_prefix("appl"), "apple"); // Only one path from "appl"
+  /// ```
+  pub fn longest_common_prefix<T: AsRef<str>>(&mut self, prefix: T) -> String {
+    let str = prefix.as_ref();
+    let mut new_prefix = String::from(str);
+
+    // Handle empty prefix case
+    if str.is_empty() {
+      return String::new();
+    }
+
+    // First phase: Navigate to the node corresponding to the input prefix
+    // If we can't find the prefix in the trie, return empty string
+    let mut prefix_node = {
+      let mut node = &mut self.root;
+      for char in str.chars() {
+        match node.children.get_mut(&char) {
+          Some(n) => node = n,
+          None => {
+            // Prefix doesn't exist in the trie
+            return String::new();
+          }
+        };
+      }
+      node
+    };
+
+    // Second phase: Continue traversing as long as there's only one unambiguous path
+    loop {
+      match prefix_node.children.len() {
+        // Case 1: Leaf node - we've reached the end of a word
+        // Case 2: Multiple children - we've reached a branching point
+        // In both cases, we return the current prefix as the LCP
+        n if n == 0 || n > 1 => {
+          return new_prefix;
+        }
+        // Case 3: Single child but current node is a word end
+        // This means we've reached a complete word that is also a prefix of a longer word
+        // We return the current prefix as the LCP to prioritize the complete word
+        1 if prefix_node.is_end => {
+          return new_prefix;
+        }
+        // Case 4: Single child and not a word end
+        // We can continue extending the prefix along this unambiguous path
+        1 => {
+          // Get the only child node and its character
+          let (char, node) = prefix_node.children.iter_mut().next().unwrap();
+          // Move to the child node
+          prefix_node = node;
+          // Extend the prefix with the new character
+          new_prefix.push(*char);
+          // Continue the loop to check the next level
+          continue;
+        }
+        // This case should never be reached due to the exhaustive matching above
+        _ => {
+          break;
+        }
+      }
+    }
+
+    new_prefix
+  }
 }
 
 #[cfg(test)]
@@ -214,5 +304,95 @@ mod tests {
     // Test completions for empty string
     let empty_completions = t.get_completions("");
     assert!(empty_completions.is_empty());
+  }
+
+  #[test]
+  fn test_longest_common_prefix() {
+    let mut t = Trie::new();
+    t.insert("xyz_foo");
+    t.insert("xyz_foo_bar");
+    t.insert("xyz_foo_bar_baz");
+
+    assert_eq!(t.longest_common_prefix("xyz_"), "xyz_foo");
+    assert_eq!(t.longest_common_prefix("xyz_foo"), "xyz_foo");
+    assert_eq!(t.longest_common_prefix("xyz_foo_"), "xyz_foo_bar");
+    assert_eq!(t.longest_common_prefix("xyz_foo_bar_"), "xyz_foo_bar_baz");
+  }
+
+  #[test]
+  fn test_lcp_empty_trie() {
+    let mut t = Trie::new();
+    assert_eq!(t.longest_common_prefix("any"), "");
+    assert_eq!(t.longest_common_prefix(""), "");
+  }
+
+  #[test]
+  fn test_lcp_branching_paths() {
+    let mut t = Trie::new();
+    t.insert("apple");
+    t.insert("application");
+    t.insert("append");
+    t.insert("banana");
+
+    // Common prefix "app" followed by different paths
+    assert_eq!(t.longest_common_prefix("app"), "app");
+    assert_eq!(t.longest_common_prefix("a"), "app");
+
+    // No common prefix beyond "a" for all words
+    assert_eq!(t.longest_common_prefix(""), "");
+
+    // Specific path tests
+    assert_eq!(t.longest_common_prefix("appl"), "appl");
+    assert_eq!(t.longest_common_prefix("appli"), "application");
+    assert_eq!(t.longest_common_prefix("appe"), "append");
+    assert_eq!(t.longest_common_prefix("b"), "banana");
+  }
+
+  #[test]
+  fn test_lcp_with_end_markers() {
+    let mut t = Trie::new();
+    t.insert("a");
+    t.insert("ab");
+    t.insert("abc");
+
+    // When a prefix is itself a word, it should return that word
+    assert_eq!(t.longest_common_prefix("a"), "a");
+    assert_eq!(t.longest_common_prefix("ab"), "ab");
+    assert_eq!(t.longest_common_prefix("abc"), "abc");
+  }
+
+  #[test]
+  fn test_lcp_non_existent_prefix() {
+    let mut t = Trie::new();
+    t.insert("hello");
+    t.insert("world");
+
+    // Prefix that doesn't exist in the trie
+    assert_eq!(t.longest_common_prefix("hi"), "");
+    assert_eq!(t.longest_common_prefix("z"), "");
+  }
+
+  #[test]
+  fn test_lcp_single_character_words() {
+    let mut t = Trie::new();
+    t.insert("a");
+    t.insert("b");
+    t.insert("c");
+
+    assert_eq!(t.longest_common_prefix("a"), "a");
+    assert_eq!(t.longest_common_prefix("b"), "b");
+    assert_eq!(t.longest_common_prefix("d"), "");
+  }
+
+  #[test]
+  fn test_lcp_unicode_characters() {
+    let mut t = Trie::new();
+    t.insert("café");
+    t.insert("cafétéria");
+    t.insert("caffè");
+
+    assert_eq!(t.longest_common_prefix("caf"), "caf");
+    assert_eq!(t.longest_common_prefix("café"), "café");
+    assert_eq!(t.longest_common_prefix("cafét"), "cafétéria");
   }
 }

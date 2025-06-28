@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Bash impl docs, see https://www.gnu.org/software/bash/manual/bash.html#Redirecting-Output
 
 use crate::trie::Trie;
@@ -133,8 +134,23 @@ fn read_input(completions: &mut Trie) -> Result<Option<String>> {
           _ => {
             tab_completions.enable();
             tab_completions.set_completions(c);
+            let input_clone = input.clone();
+            let prefix = String::from_utf8_lossy(input_clone.as_slice());
+            let lcp = completions.longest_common_prefix(&prefix);
 
-            AnsiCode::BEL.write();
+            if prefix == lcp {
+              AnsiCode::BEL.write();
+              stdout.flush()?;
+              continue;
+            }
+
+            print!("\r\x1b[K"); // Clear line and move cursor to start
+            print!("$ {}", lcp); // No space in the end as multiple completions is available
+            stdout.flush()?; // Push all changes to stdout immediately
+
+            input.clear();
+            input.extend(lcp.as_bytes());
+
             stdout.flush()?;
           }
         }
