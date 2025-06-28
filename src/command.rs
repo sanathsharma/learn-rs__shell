@@ -26,8 +26,8 @@ pub enum Cmd {
 }
 
 impl From<String> for Cmd {
-  fn from(value: String) -> Self {
-    match value.as_str() {
+  fn from(program: String) -> Self {
+    match program.as_str() {
       "echo" => Cmd::Echo,
       "exit" => Cmd::Exit,
       "type" => Cmd::Type,
@@ -37,7 +37,7 @@ impl From<String> for Cmd {
         if let Some(executable_path) = find_command(cmd) {
           return Cmd::Executable(ExecutableCmd {
             // avoid conversion from cmd.to_string(), by passing value
-            cmd: value,
+            cmd: program,
             path: executable_path,
           });
         };

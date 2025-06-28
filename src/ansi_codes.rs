@@ -19,6 +19,7 @@ pub enum AnsiCode {
     CRLF,
     MoveCursorLeft,
     MoveCursorRight,
+    BEL,
 }
 
 impl AnsiCode {
@@ -36,6 +37,7 @@ impl AnsiCode {
             AnsiCode::MoveCursorLeft => "\x1b[D",
             AnsiCode::MoveCursorRight => "\x1b[C",
             AnsiCode::CRLF => "\r\n",
+            AnsiCode::BEL => "\x07",
         }
     }
 

@@ -79,6 +79,9 @@ fn read_input(completions: &mut Trie) -> Result<Option<String>> {
           input.extend(b" ");
           continue;
         }
+
+        AnsiCode::BEL.write();
+        stdout.flush()?;
       }
       b'\n' | b'\r' => {
         // print!("\n\r"); // Move to start of a new line
