@@ -1,18 +1,24 @@
+use crate::writer::CmdOutput;
+use crate::{
+  args::CmdArgs,
+  utils::{expand_tilda, find_command},
+};
+use std::io::Write;
 use std::{
   env,
   io::{self},
   process::{self, Stdio},
 };
 
-use crate::{
-  args::CmdArgs,
-  utils::{expand_tilda, find_command},
-  writer::CmdOuputWriter,
-};
 pub struct ExecutableCmd {
   cmd: String,
 
   path: String,
+}
+
+pub enum CmdInput {
+  String(String),
+  Bytes(Vec<u8>),
 }
 
 pub enum Cmd {
@@ -48,25 +54,47 @@ impl From<String> for Cmd {
   }
 }
 
-impl Cmd {
-  pub fn exec(&self, cmd_args: CmdArgs) {
-    let writer = CmdOuputWriter::new(cmd_args.redirection.clone());
+#[derive(Clone, Debug)]
+pub struct ExecutionOutput(pub Option<CmdOutput>, pub Option<CmdOutput>);
 
+impl ExecutionOutput {
+  pub fn none() -> Self {
+    Self(None, None)
+  }
+
+  pub fn stdout<T: Into<String>>(stdout: T) -> Self {
+    Self(Some(CmdOutput::Stdout(stdout.into())), None)
+  }
+
+  pub fn stdout_bytes(stdout: Vec<u8>) -> Self {
+    Self(Some(CmdOutput::StdoutBytes(stdout)), None)
+  }
+
+  pub fn stderr<T: Into<String>>(stderr: T) -> Self {
+    Self(None, Some(CmdOutput::Stderr(stderr.into())))
+  }
+
+  pub fn stderr_bytes(stderr: Vec<u8>) -> Self {
+    Self(None, Some(CmdOutput::StderrBytes(stderr)))
+  }
+}
+
+impl Cmd {
+  pub fn exec(&self, cmd_args: CmdArgs, input: Option<CmdInput>) -> ExecutionOutput {
     match self {
-      Self::Exit => exec_exit(cmd_args, writer),
-      Self::Echo => exec_echo(cmd_args, writer),
-      Self::Type => exec_type(cmd_args, writer),
-      Self::Executable(cmd) => exec_executable(cmd, cmd_args, writer),
-      Self::Cd => exec_cd(cmd_args, writer),
-      Self::Pwd => exec_pwd(cmd_args, writer),
-      Self::Unknown => {}
+      Self::Exit => exec_exit(cmd_args),
+      Self::Echo => exec_echo(cmd_args),
+      Self::Type => exec_type(cmd_args),
+      Self::Executable(cmd) => exec_executable(cmd, cmd_args, input),
+      Self::Cd => exec_cd(cmd_args),
+      Self::Pwd => exec_pwd(cmd_args),
+      Self::Unknown => ExecutionOutput::none(),
     }
   }
 }
 
-fn exec_exit(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+fn exec_exit(cmd_args: CmdArgs) -> ExecutionOutput {
   let args = cmd_args
-    .args
     .iter()
     .map(|arg| arg.as_str())
     .collect::<Vec<&str>>();
@@ -78,20 +106,19 @@ fn exec_exit(cmd_args: CmdArgs, writer: CmdOuputWriter) {
         process::exit(code.into());
       }
 
-      writer.output_error_string("exit: invalid code");
+      ExecutionOutput::stderr("exit: invalid code")
     }
-    _ => writer.output_error_string("exit: expected 1 arg at most"),
+    _ => ExecutionOutput::stderr("exit: expected 1 arg at most"),
   }
 }
 
-fn exec_echo(cmd_args: CmdArgs, writer: CmdOuputWriter) {
-  let args = &cmd_args.args[1..].join(" ");
-  writer.output_string(args);
+fn exec_echo(cmd_args: CmdArgs) -> ExecutionOutput {
+  let args = cmd_args[1..].join(" ");
+  ExecutionOutput::stdout(args)
 }
 
-fn exec_type(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+fn exec_type(cmd_args: CmdArgs) -> ExecutionOutput {
   let args = cmd_args
-    .args
     .iter()
     .map(|arg| arg.as_str())
     .collect::<Vec<&str>>();
@@ -100,18 +127,21 @@ fn exec_type(cmd_args: CmdArgs, writer: CmdOuputWriter) {
     ["type", command] => {
       let builtin = Cmd::from(command.to_string());
       match builtin {
-        Cmd::Unknown => writer.output_error_string(format!("{}: not found", command)),
-        Cmd::Executable(exe) => writer.output_string(format!("{} is {}", exe.cmd, exe.path)),
-        _ => writer.output_string(format!("{} is a shell builtin", command)),
+        Cmd::Unknown => ExecutionOutput::stderr(format!("{}: not found", command)),
+        Cmd::Executable(exe) => ExecutionOutput::stdout(format!("{} is {}", exe.cmd, exe.path)),
+        _ => ExecutionOutput::stdout(format!("{} is a shell builtin", command)),
       }
     }
-    _ => writer.output_error_string("type: expected 1 arg"),
+    _ => ExecutionOutput::stderr("type: expected 1 arg"),
   }
 }
 
-fn exec_executable(executable_cmd: &ExecutableCmd, cmd_args: CmdArgs, writer: CmdOuputWriter) {
+fn exec_executable(
+  executable_cmd: &ExecutableCmd,
+  cmd_args: CmdArgs,
+  input: Option<CmdInput>,
+) -> ExecutionOutput {
   let args = cmd_args
-    .args
     .iter()
     .map(|arg| arg.as_str())
     .collect::<Vec<&str>>();
@@ -120,35 +150,53 @@ fn exec_executable(executable_cmd: &ExecutableCmd, cmd_args: CmdArgs, writer: Cm
     .args(args.iter().skip(1))
     // INFO: Stdio::piped makes the child not write it to stdout & stderr that is inherited from the
     // terminal session
+    .stdin(Stdio::piped())
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
     .spawn();
 
   let output = match command {
-    Ok(child) => child.wait_with_output(),
+    Ok(mut child) => {
+      println!("Waiting for output");
+      match input {
+        Some(CmdInput::String(string)) => {
+          let mut stdin = child.stdin.take().unwrap();
+          stdin.write(string.as_bytes()).unwrap();
+        }
+        Some(CmdInput::Bytes(bytes)) => {
+          let mut stdin = child.stdin.take().unwrap();
+          stdin.write(bytes.as_slice()).unwrap();
+        }
+        None => {}
+      }
+      child.wait_with_output()
+    }
     Err(_) => {
-      writer.output_error_string(format!("{}: failed to execute", executable_cmd.cmd));
-      return;
+      return ExecutionOutput::stderr(format!("{}: failed to execute", executable_cmd.cmd));
     }
   };
 
   match output {
     Ok(output) => {
+      let mut stdout: Option<CmdOutput> = None;
+      let mut stderr: Option<CmdOutput> = None;
+
       if !output.stdout.is_empty() {
-        writer.output(&output.stdout);
+        stdout = Some(CmdOutput::StdoutBytes(output.stdout));
       }
 
       if !output.stderr.is_empty() {
-        writer.output_error(&output.stderr);
+        stderr = Some(CmdOutput::StderrBytes(output.stderr));
       }
+
+      ExecutionOutput(stdout, stderr)
     }
-    Err(_) => writer.output_error_string(format!("{}: failed to execute", executable_cmd.cmd)),
+    Err(_) => ExecutionOutput::stderr(format!("{}: failed to execute", executable_cmd.cmd)),
   }
 }
 
-fn exec_cd(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+fn exec_cd(cmd_args: CmdArgs) -> ExecutionOutput {
   let args = cmd_args
-    .args
     .iter()
     .map(|arg| arg.as_str())
     .collect::<Vec<&str>>();
@@ -163,22 +211,18 @@ fn exec_cd(cmd_args: CmdArgs, writer: CmdOuputWriter) {
       }
     }
     _ => {
-      writer.output_error_string("cd: expected 1 arg at most");
-      return;
+      return ExecutionOutput::stderr("cd: expected 1 arg at most");
     }
   };
 
   match cwd {
-    Ok(_) => (),
-    Err(_) => {
-      writer.output_error_string(format!("cd: {}: No such file or directory", path));
-    }
+    Ok(_) => ExecutionOutput::none(),
+    Err(_) => ExecutionOutput::stderr(format!("cd: {}: No such file or directory", path)),
   }
 }
 
-fn exec_pwd(cmd_args: CmdArgs, writer: CmdOuputWriter) {
+fn exec_pwd(cmd_args: CmdArgs) -> ExecutionOutput {
   let args = cmd_args
-    .args
     .iter()
     .map(|arg| arg.as_str())
     .collect::<Vec<&str>>();
@@ -186,8 +230,8 @@ fn exec_pwd(cmd_args: CmdArgs, writer: CmdOuputWriter) {
   match args.as_slice() {
     ["pwd"] => {
       let current_dir = env::current_dir().unwrap();
-      writer.output_string(format!("{}", current_dir.display()));
+      ExecutionOutput::stdout(format!("{}", current_dir.display()))
     }
-    _ => writer.output_error_string("pwd: expected 0 args"),
+    _ => ExecutionOutput::stderr("pwd: expected 0 args"),
   }
 }

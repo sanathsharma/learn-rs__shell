@@ -3,6 +3,14 @@ use std::{
   io::{Seek, SeekFrom, Write},
 };
 
+#[derive(Clone, Debug)]
+pub enum CmdOutput {
+  Stdout(String),
+  Stderr(String),
+  StdoutBytes(Vec<u8>),
+  StderrBytes(Vec<u8>),
+}
+
 #[derive(Debug, Clone)]
 pub enum Redirection {
   // Redirect stdout output into a file
@@ -14,17 +22,17 @@ pub enum Redirection {
 }
 
 #[derive(Debug, Clone)]
-pub struct CmdOuputWriter {
+pub struct CmdOutputWriter {
   redirection: Redirection,
 }
 
-impl CmdOuputWriter {
+impl CmdOutputWriter {
   pub fn new(redirection: Redirection) -> Self {
     Self { redirection }
   }
 }
 
-impl CmdOuputWriter {
+impl CmdOutputWriter {
   pub fn output(&self, buf: &[u8]) {
     let print_to_stdout = || {
       if buf.is_empty() {
@@ -199,6 +207,15 @@ impl CmdOuputWriter {
       Redirection::None => {
         eprintln!("{}", string);
       }
+    }
+  }
+
+  pub fn write_cmd_output(&self, cmd_output: CmdOutput) {
+    match cmd_output {
+      CmdOutput::Stdout(string) => self.output_string(string),
+      CmdOutput::StdoutBytes(bytes) => self.output(&bytes),
+      CmdOutput::Stderr(string) => self.output_error_string(string),
+      CmdOutput::StderrBytes(bytes) => self.output(&bytes),
     }
   }
 }

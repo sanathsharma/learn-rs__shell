@@ -1,63 +1,55 @@
+use crate::utils;
+use crate::writer::Redirection;
+
 const SPACE: char = ' ';
 const SINGLE_QUOTE: char = '\'';
 const DOUBLE_QUOTE: char = '\"';
 const ESCAPE: char = '\\';
 
-use crate::writer::Redirection;
+pub type CmdArgs = Vec<String>;
 
-#[derive(Debug)]
-pub struct CmdArgs {
-  pub args: Vec<String>,
-  pub redirection: Redirection,
-}
-
-impl CmdArgs {
-  pub fn from_args_vec(args: &Vec<String>) -> Self {
-    let mut args_iter = args.iter();
-    let mut final_args: Vec<String> = Vec::new();
-    let mut redirection = Redirection::None;
-    loop {
-      let current = args_iter.next();
-      if let Some(current) = current {
-        match current.as_str() {
-          "1>" | ">" => {
-            redirection = Redirection::Stdout {
-              file_path: args_iter.next().unwrap().clone(),
-              append: false,
-            };
-          }
-          "2>" => {
-            redirection = Redirection::Stderr {
-              file_path: args_iter.next().unwrap().clone(),
-              append: false,
-            }
-          }
-          "1>>" | ">>" => {
-            redirection = Redirection::Stdout {
-              file_path: args_iter.next().unwrap().clone(),
-              append: true,
-            };
-          }
-          "2>>" => {
-            redirection = Redirection::Stderr {
-              file_path: args_iter.next().unwrap().clone(),
-              append: true,
-            }
-          }
-          _ => {
-            final_args.push(current.clone());
+fn extract_redirection(args: &Vec<String>) -> (CmdArgs, Redirection) {
+  let mut args_iter = args.iter();
+  let mut final_args: Vec<String> = Vec::new();
+  let mut redirection = Redirection::None;
+  loop {
+    let current = args_iter.next();
+    if let Some(current) = current {
+      match current.as_str() {
+        "1>" | ">" => {
+          redirection = Redirection::Stdout {
+            file_path: args_iter.next().unwrap().clone(),
+            append: false,
+          };
+        }
+        "2>" => {
+          redirection = Redirection::Stderr {
+            file_path: args_iter.next().unwrap().clone(),
+            append: false,
           }
         }
-      } else {
-        break;
+        "1>>" | ">>" => {
+          redirection = Redirection::Stdout {
+            file_path: args_iter.next().unwrap().clone(),
+            append: true,
+          };
+        }
+        "2>>" => {
+          redirection = Redirection::Stderr {
+            file_path: args_iter.next().unwrap().clone(),
+            append: true,
+          }
+        }
+        _ => {
+          final_args.push(current.clone());
+        }
       }
-    }
-
-    CmdArgs {
-      args: final_args,
-      redirection,
+    } else {
+      break;
     }
   }
+
+  (final_args, redirection)
 }
 
 pub enum WaitFor {
@@ -76,7 +68,7 @@ pub enum WaitFor {
 ///
 /// # Returns
 /// A vector of strings, where each string is a separate command argument
-pub fn parse_args(full_command: String) -> CmdArgs {
+pub fn parse_args(full_command: String) -> Vec<(CmdArgs, Redirection)> {
   let mut args: Vec<String> = Vec::new();
   let mut arg = String::new();
   // Wait for this char while appending other characters to arg
@@ -157,5 +149,11 @@ pub fn parse_args(full_command: String) -> CmdArgs {
     args.push(arg);
   }
 
-  CmdArgs::from_args_vec(&args)
+  // Split by pipe, to extract multiple chainable commands
+  let groups = utils::split_vec_by_delimiter(args, "|");
+
+  groups
+    .iter()
+    .map(|args| extract_redirection(&args))
+    .collect()
 }
