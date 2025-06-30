@@ -4,9 +4,8 @@
 use crate::trie::Trie;
 use args::parse_args;
 use command::Cmd;
-use std::io::Read;
-use std::io::{self, Write};
-use std::process::Command;
+use std::io::{self, Read, Write};
+use std::process::{Command, Stdio};
 
 mod ansi_codes;
 mod args;
@@ -96,6 +95,10 @@ fn main() -> Result<()> {
             CmdOutput::StdoutBytes(bytes) => {
               // Pass the binary output to the next command's stdin
               piped_stdin = Some(CmdInput::Bytes(bytes));
+            }
+            CmdOutput::Stream(mut child) => {
+              let stdout = child.stdout.take().unwrap();
+              piped_stdin = Some(CmdInput::Pipe(Stdio::from(stdout)));
             }
             // Ignore other output types for piping
             _ => {}

@@ -19,6 +19,7 @@ pub struct ExecutableCmd {
 pub enum CmdInput {
   String(String),
   Bytes(Vec<u8>),
+  Pipe(Stdio),
 }
 
 pub enum Cmd {
@@ -54,7 +55,7 @@ impl From<String> for Cmd {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ExecutionOutput(pub Option<CmdOutput>, pub Option<CmdOutput>);
 
 impl ExecutionOutput {
@@ -146,52 +147,42 @@ fn exec_executable(
     .map(|arg| arg.as_str())
     .collect::<Vec<&str>>();
 
+  let (stdin, data) = match input {
+    Some(CmdInput::Pipe(stdio)) => (stdio, None),
+    Some(CmdInput::String(string)) => (Stdio::piped(), Some(CmdInput::String(string))),
+    Some(CmdInput::Bytes(bytes)) => (Stdio::piped(), Some(CmdInput::Bytes(bytes))),
+    None => (Stdio::inherit(), None),
+  };
+
   let command = std::process::Command::new(executable_cmd.cmd.clone())
     .args(args.iter().skip(1))
     // INFO: Stdio::piped makes the child not write it to stdout & stderr that is inherited from the
     // terminal session
-    .stdin(Stdio::piped())
+    .stdin(stdin)
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
     .spawn();
 
-  let output = match command {
+  match command {
     Ok(mut child) => {
-      println!("Waiting for output");
-      match input {
+      match data {
         Some(CmdInput::String(string)) => {
-          let mut stdin = child.stdin.take().unwrap();
-          stdin.write(string.as_bytes()).unwrap();
+          if let Some(mut stdin) = child.stdin.take() {
+            stdin.write(string.as_bytes()).unwrap();
+          }
         }
         Some(CmdInput::Bytes(bytes)) => {
-          let mut stdin = child.stdin.take().unwrap();
-          stdin.write(bytes.as_slice()).unwrap();
+          if let Some(mut stdin) = child.stdin.take() {
+            stdin.write(bytes.as_slice()).unwrap();
+          }
         }
-        None => {}
+        _ => {}
       }
-      child.wait_with_output()
+      ExecutionOutput(Some(CmdOutput::Stream(child)), None)
     }
     Err(_) => {
       return ExecutionOutput::stderr(format!("{}: failed to execute", executable_cmd.cmd));
     }
-  };
-
-  match output {
-    Ok(output) => {
-      let mut stdout: Option<CmdOutput> = None;
-      let mut stderr: Option<CmdOutput> = None;
-
-      if !output.stdout.is_empty() {
-        stdout = Some(CmdOutput::StdoutBytes(output.stdout));
-      }
-
-      if !output.stderr.is_empty() {
-        stderr = Some(CmdOutput::StderrBytes(output.stderr));
-      }
-
-      ExecutionOutput(stdout, stderr)
-    }
-    Err(_) => ExecutionOutput::stderr(format!("{}: failed to execute", executable_cmd.cmd)),
   }
 }
 

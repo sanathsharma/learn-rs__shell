@@ -1,14 +1,15 @@
-use std::{
-  fs::OpenOptions,
-  io::{Seek, SeekFrom, Write},
-};
+use std::io::{BufReader, Read};
+use std::process::Child;
+use std::sync::Arc;
+use std::{fs::OpenOptions, io::{Seek, SeekFrom, Write}, thread};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum CmdOutput {
   Stdout(String),
   Stderr(String),
   StdoutBytes(Vec<u8>),
   StderrBytes(Vec<u8>),
+  Stream(Child),
 }
 
 #[derive(Debug, Clone)]
@@ -216,6 +217,45 @@ impl CmdOutputWriter {
       CmdOutput::StdoutBytes(bytes) => self.output(&bytes),
       CmdOutput::Stderr(string) => self.output_error_string(string),
       CmdOutput::StderrBytes(bytes) => self.output(&bytes),
+      CmdOutput::Stream(mut child) => {
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+        let writer = Arc::new(self.clone());
+        let writer_stdout = Arc::clone(&writer);
+        let writer_stderr = Arc::clone(&writer);
+
+        let _stdout_handle = thread::spawn(move || {
+          let mut reader = BufReader::new(stdout);
+          let mut buf = [0u8; 4096];
+          loop {
+            let size = reader.read(&mut buf).unwrap();
+            if size == 0 {
+              continue;
+            }
+            writer_stdout.output(&buf[..size]);
+          }
+        });
+
+        let _stderr_handle = thread::spawn(move || {
+          let mut reader = BufReader::new(stderr);
+          let mut buf = [0u8; 4096];
+          loop {
+            let size = reader.read(&mut buf).unwrap();
+            if size == 0 {
+              continue;
+            }
+            writer_stderr.output_error(&buf[..size]);
+          }
+        });
+
+        child.wait().unwrap();
+        // NOTE: don't join the thread handles, as we don't want to wait for thread to complete when program already has
+        // stdout_handle.join().unwrap();
+        // stderr_handle.join().unwrap();
+      }
     }
   }
 }
+
+// TODO
+// - [ ] kill waiting child process on ctrl-c
