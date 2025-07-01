@@ -114,7 +114,8 @@ fn exec_exit(cmd_args: CmdArgs) -> ExecutionOutput {
 }
 
 fn exec_echo(cmd_args: CmdArgs) -> ExecutionOutput {
-  let args = cmd_args[1..].join(" ");
+  let mut args = cmd_args[1..].join(" ");
+  args.push('\n'); // echo appends new line unless -n flag is passed
   ExecutionOutput::stdout(args)
 }
 
@@ -129,8 +130,8 @@ fn exec_type(cmd_args: CmdArgs) -> ExecutionOutput {
       let builtin = Cmd::from(command.to_string());
       match builtin {
         Cmd::Unknown => ExecutionOutput::stderr(format!("{}: not found", command)),
-        Cmd::Executable(exe) => ExecutionOutput::stdout(format!("{} is {}", exe.cmd, exe.path)),
-        _ => ExecutionOutput::stdout(format!("{} is a shell builtin", command)),
+        Cmd::Executable(exe) => ExecutionOutput::stdout(format!("{} is {}\n", exe.cmd, exe.path)),
+        _ => ExecutionOutput::stdout(format!("{} is a shell builtin\n", command)),
       }
     }
     _ => ExecutionOutput::stderr("type: expected 1 arg"),
@@ -221,7 +222,7 @@ fn exec_pwd(cmd_args: CmdArgs) -> ExecutionOutput {
   match args.as_slice() {
     ["pwd"] => {
       let current_dir = env::current_dir().unwrap();
-      ExecutionOutput::stdout(format!("{}", current_dir.display()))
+      ExecutionOutput::stdout(format!("{}\n", current_dir.display()))
     }
     _ => ExecutionOutput::stderr("pwd: expected 0 args"),
   }

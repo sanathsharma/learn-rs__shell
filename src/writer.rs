@@ -61,18 +61,12 @@ impl CmdOutputWriter {
         let file = OpenOptions::new()
           .write(true)
           .append(append)
+          .truncate(!append)
           .create(true)
           .open(&file_path);
 
         let write = match file {
-          Ok(mut file) => {
-            let file_size = file.seek(SeekFrom::End(0)).unwrap();
-            if append && file_size > 0 {
-              write!(file, "\n{}", String::from_utf8_lossy(buf))
-            } else {
-              file.write_all(buf)
-            }
-          }
+          Ok(mut file) => file.write_all(buf),
           Err(_) => {
             eprintln!("Error opening file {}", file_path);
             return written_to_stdout;
@@ -84,15 +78,7 @@ impl CmdOutputWriter {
           Err(_) => eprintln!("Error writing to {}", file_path),
         }
       }
-      Redirection::Stderr { file_path, append } => {
-        print_to_stdout();
-        let _ = OpenOptions::new()
-          .create(true)
-          .append(append)
-          .write(true)
-          .open(&file_path);
-      }
-      Redirection::None => print_to_stdout(),
+      _ => print_to_stdout(),
     }
 
     written_to_stdout
@@ -105,18 +91,12 @@ impl CmdOutputWriter {
         let file = OpenOptions::new()
           .write(true)
           .append(append)
+          .truncate(!append)
           .create(true)
           .open(&file_path);
 
         let write = match file {
-          Ok(mut file) => {
-            let file_size = file.seek(SeekFrom::End(0)).unwrap();
-            if append && file_size > 0 {
-              write!(file, "\n{}", string)
-            } else {
-              write!(file, "{}", string)
-            }
-          }
+          Ok(mut file) => write!(file, "{}", string),
           Err(_) => {
             eprintln!("Error opening file {}", file_path);
             return;
@@ -128,17 +108,7 @@ impl CmdOutputWriter {
           Err(_) => eprintln!("Error writing to {}", file_path),
         }
       }
-      Redirection::Stderr { file_path, append } => {
-        println!("{}", string);
-        let _ = OpenOptions::new()
-          .create(true)
-          .append(append)
-          .write(true)
-          .open(&file_path);
-      }
-      Redirection::None => {
-        println!("{}", string);
-      }
+      _ => print!("{}", string),
     }
   }
   pub fn output_error(&self, buf: &[u8]) -> bool {
@@ -158,6 +128,7 @@ impl CmdOutputWriter {
         let file = OpenOptions::new()
           .write(true)
           .append(append)
+          .truncate(!append)
           .create(true)
           .open(&file_path);
 
@@ -174,15 +145,7 @@ impl CmdOutputWriter {
           Err(_) => eprintln!("Error writing to {}", file_path),
         }
       }
-      Redirection::Stdout { file_path, append } => {
-        print_to_stderr();
-        let _ = OpenOptions::new()
-          .create(true)
-          .append(append)
-          .write(true)
-          .open(&file_path);
-      }
-      Redirection::None => {}
+      _ => print_to_stderr(),
     }
 
     written_to_stderr
@@ -195,6 +158,7 @@ impl CmdOutputWriter {
         let file = OpenOptions::new()
           .write(true)
           .append(append)
+          .truncate(!append)
           .create(true)
           .open(&file_path);
 
@@ -211,17 +175,24 @@ impl CmdOutputWriter {
           Err(_) => eprintln!("Error writing to {}", file_path),
         }
       }
-      Redirection::Stdout { file_path, append } => {
-        eprintln!("{}", string);
-        let _ = OpenOptions::new()
-          .create(true)
-          .append(append)
-          .write(true)
-          .open(&file_path);
+      _ => eprintln!("{}", string),
+    }
+  }
+
+  fn create_redirection_file(&self) {
+    match self.redirection.clone() {
+      Redirection::Stdout { file_path, .. } | Redirection::Stderr { file_path, .. } => {
+        let file  = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&file_path);
+
+
+        if let Err(err) = file {
+          eprintln!("Error opening file {}: {}", file_path, err);
+        }
       }
-      Redirection::None => {
-        eprintln!("{}", string);
-      }
+      Redirection::None => {}
     }
   }
 
@@ -236,13 +207,13 @@ impl CmdOutputWriter {
         let _ = self.output_error(&bytes);
       }
       CmdOutput::Stream(mut child) => {
-        let end_lf = Arc::new(AtomicBool::new(false));
-        let end_lf_stdout = Arc::clone(&end_lf);
-        let end_lf_stderr = Arc::clone(&end_lf_stdout);
-
-        let was_written = Arc::new(AtomicBool::new(false));
-        let was_written_stdout = Arc::clone(&was_written);
-        let was_written_stderr = Arc::clone(&was_written_stdout);
+        // let end_lf = Arc::new(AtomicBool::new(false));
+        // let end_lf_stdout = Arc::clone(&end_lf);
+        // let end_lf_stderr = Arc::clone(&end_lf_stdout);
+        //
+        // let was_written = Arc::new(AtomicBool::new(false));
+        // let was_written_stdout = Arc::clone(&was_written);
+        // let was_written_stderr = Arc::clone(&was_written_stdout);
 
         // INFO: Inner block to stop the treads when the job handle goes out of scope, so that new
         // line insertion's order can be guaranteed
@@ -253,39 +224,39 @@ impl CmdOutputWriter {
           let writer_stdout = Arc::clone(&writer);
           let writer_stderr = Arc::clone(&writer);
 
-          let _stdout_handle = thread::spawn(move || {
+          let stdout_handle = thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
             let mut buf = [0u8; 4096];
             loop {
               let size = reader.read(&mut buf).unwrap();
               if size == 0 {
-                continue;
+                break;
               }
 
-              if buf[size - 1] == b'\n' {
-                end_lf_stdout.store(true, Ordering::SeqCst);
-              }
+              // if buf[size - 1] == b'\n' {
+              //   end_lf_stdout.store(true, Ordering::SeqCst);
+              // }
 
-              let written = writer_stdout.output(&buf[..size]);
-              was_written_stdout.store(written, Ordering::SeqCst);
+              let _written = writer_stdout.output(&buf[..size]);
+              // was_written_stdout.store(written, Ordering::SeqCst);
             }
           });
 
-          let _stderr_handle = thread::spawn(move || {
+          let stderr_handle = thread::spawn(move || {
             let mut reader = BufReader::new(stderr);
             let mut buf = [0u8; 4096];
             loop {
               let size = reader.read(&mut buf).unwrap();
               if size == 0 {
-                continue;
+                break;
               }
 
-              if buf[size - 1] == b'\n' {
-                end_lf_stderr.store(true, Ordering::SeqCst);
-              }
+              // if buf[size - 1] == b'\n' {
+              //   end_lf_stderr.store(true, Ordering::SeqCst);
+              // }
 
-              let written = writer_stderr.output_error(&buf[..size]);
-              was_written_stderr.store(written, Ordering::SeqCst);
+              let _written = writer_stderr.output_error(&buf[..size]);
+              // was_written_stderr.store(written, Ordering::SeqCst);
             }
           });
 
@@ -295,12 +266,14 @@ impl CmdOutputWriter {
           // stderr_handle.join().unwrap();
         }
 
-        if was_written.load(Ordering::SeqCst) && !end_lf.load(Ordering::SeqCst) {
-          println!();
-        }
+        // if was_written.load(Ordering::SeqCst) && !end_lf.load(Ordering::SeqCst) {
+        //   println!();
+        // }
         // println!();
       }
     }
+
+    self.create_redirection_file();
   }
 }
 
@@ -308,3 +281,4 @@ impl CmdOutputWriter {
 // - [ ] open the stdin while writing from child stream, that way ctrl-c or any other keystroke can be listened to.
 // - [ ] kill waiting child process on ctrl-c
 // - [ ] refactor write_cmd_output, stream case, to see if arc usage can minimized
+// - [ ] clean up end_lf, was written, print_to_stdout and print_to_stderr (unwanted code or abstractions)

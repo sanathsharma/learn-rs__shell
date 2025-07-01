@@ -39,6 +39,7 @@ fn main() -> Result<()> {
     // Display the shell prompt
     print!("$ ");
     io::stdout().flush()?;
+    io::stderr().flush()?;
 
     // Wait for user input
     // let mut input = String::new();
