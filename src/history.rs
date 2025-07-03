@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 
 #[derive(Default)]
 pub struct History {
   pub stack: Vec<String>,
+  file_append_state: HashMap<String, usize>, // filename -> next_appended_index
 }
 
 impl History {
@@ -12,8 +14,14 @@ impl History {
   }
 
   pub fn from_file(file_path: &str) -> Self {
+    let stack = load_file(file_path);
+    let mut file_append_state = HashMap::new();
+
+    file_append_state.insert(file_path.to_string(), stack.len());
+
     Self {
-      stack: load_file(file_path),
+      stack,
+      file_append_state,
     }
   }
 
@@ -30,6 +38,10 @@ impl History {
     self.stack.extend(content);
 
     self
+      .file_append_state
+      .insert(file_path.to_string(), self.stack.len());
+
+    self
   }
 
   // TODO: return a result
@@ -38,10 +50,19 @@ impl History {
     self.stack.extend(content);
 
     self
+      .file_append_state
+      .insert(file_path.to_string(), self.stack.len());
+
+    self
   }
 
   // TODO: return a result
-  pub fn write_to_file(&self, file_path: &str, append: bool) {
+  pub fn write_to_file(&mut self, file_path: &str, append: bool) {
+    let mut skip = 0_usize;
+    if append {
+      skip = *self.file_append_state.entry(file_path.into()).or_insert(0);
+    }
+
     let file = OpenOptions::new()
       .write(true)
       .create(true)
@@ -57,9 +78,13 @@ impl History {
     };
 
     let mut output = String::new();
-    for line in self.stack.iter() {
+    for line in self.stack.iter().skip(skip) {
       output.push_str(format!("{}\n", line).as_str());
     }
+
+    self
+      .file_append_state
+      .insert(file_path.into(), self.stack.len());
 
     write!(file, "{}", output).unwrap();
   }
