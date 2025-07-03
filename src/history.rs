@@ -45,3 +45,7 @@ impl HistoryNavigation {
     stack.get(self.pointer)
   }
 }
+
+// TODO:
+// [ ] accept completions and set_completions method
+// [ ] given a prefix autocomplete based on the completions from prefix tree

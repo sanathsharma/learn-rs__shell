@@ -124,6 +124,7 @@ pub fn read_input(cmd_completions: &mut Trie, history: &History) -> crate::Resul
           print!("\r\x1b[K"); // Clear line and move cursor to start
           print!("$ {}", completion);
           stdout.flush()?; // Push all changes to stdout immediately
+          input = completion.as_bytes().to_vec();
         }
       }
       // Down arrow [27, 91, 66] or "ESC [ 66"
@@ -133,9 +134,11 @@ pub fn read_input(cmd_completions: &mut Trie, history: &History) -> crate::Resul
           print!("\r\x1b[K"); // Clear line and move cursor to start
           print!("$ {}", completion);
           stdout.flush()?; // Push all changes to stdout immediately
+          input = completion.as_bytes().to_vec();
         } else {
           print!("\r\x1b[K"); // Clear line and move cursor to start
-          print!("$ {}", String::from_utf8_lossy(&input));
+          print!("$ ");
+          input.clear();
           stdout.flush()?; // Push all changes to stdout immediately
         };
       }
