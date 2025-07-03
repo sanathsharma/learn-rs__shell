@@ -29,6 +29,7 @@ pub enum Cmd {
   Executable(ExecutableCmd),
   Cd,
   Pwd,
+  History,
   Unknown,
 }
 
@@ -40,6 +41,7 @@ impl From<String> for Cmd {
       "type" => Cmd::Type,
       "pwd" => Cmd::Pwd,
       "cd" => Cmd::Cd,
+      "history" => Cmd::History,
       cmd => {
         if let Some(executable_path) = find_command(cmd) {
           return Cmd::Executable(ExecutableCmd {
@@ -89,6 +91,7 @@ impl Cmd {
       Self::Executable(cmd) => exec_executable(cmd, cmd_args, input),
       Self::Cd => exec_cd(cmd_args),
       Self::Pwd => exec_pwd(cmd_args),
+      Self::History => exec_history(cmd_args),
       Self::Unknown => ExecutionOutput::none(),
     }
   }
@@ -226,4 +229,8 @@ fn exec_pwd(cmd_args: CmdArgs) -> ExecutionOutput {
     }
     _ => ExecutionOutput::stderr("pwd: expected 0 args"),
   }
+}
+
+fn exec_history(_cmd_args: CmdArgs) -> ExecutionOutput {
+  ExecutionOutput::none()
 }
