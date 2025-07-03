@@ -256,6 +256,7 @@ fn exec_history(cmd_args: CmdArgs, history: &mut History) -> ExecutionOutput {
       // Options (Convert to Options struct if multiple args are accepted)
       let mut read_file_path: Option<&str> = None;
       let mut write_file_path: Option<&str> = None;
+      let mut append_write = false;
 
       let mut iter = args.iter();
       loop {
@@ -281,6 +282,14 @@ fn exec_history(cmd_args: CmdArgs, history: &mut History) -> ExecutionOutput {
               return ExecutionOutput::stderr("history: expected a file_path value for -w");
             };
           }
+          "-a" => {
+            if let Some(path) = iter.next() {
+              write_file_path = Some(*path);
+              append_write = true;
+            } else {
+              return ExecutionOutput::stderr("history: expected a file_path value for -a");
+            };
+          }
           _ => return ExecutionOutput::stderr("history: invalid args"),
         }
       }
@@ -291,7 +300,7 @@ fn exec_history(cmd_args: CmdArgs, history: &mut History) -> ExecutionOutput {
       }
 
       if let Some(file_path) = write_file_path {
-        history.write_to_file(file_path);
+        history.write_to_file(file_path, append_write);
         return ExecutionOutput::none();
       }
 

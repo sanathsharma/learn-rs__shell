@@ -41,11 +41,12 @@ impl History {
   }
 
   // TODO: return a result
-  pub fn write_to_file(&self, file_path: &str) {
+  pub fn write_to_file(&self, file_path: &str, append: bool) {
     let file = OpenOptions::new()
       .write(true)
       .create(true)
-      .truncate(true)
+      .append(append)
+      .truncate(!append)
       .open(file_path);
 
     let mut file = match file {
