@@ -164,7 +164,7 @@ fn exec_executable(
     None => (Stdio::inherit(), None),
   };
 
-  let command = std::process::Command::new(executable_cmd.cmd.clone())
+  let command = process::Command::new(executable_cmd.cmd.clone())
     .args(args.iter().skip(1))
     // INFO: Stdio::piped makes the child not write it to stdout & stderr that is inherited from the
     // terminal session
@@ -190,9 +190,7 @@ fn exec_executable(
       }
       ExecutionOutput(Some(CmdOutput::Stream(child)), None)
     }
-    Err(_) => {
-      return ExecutionOutput::stderr(format!("{}: failed to execute", executable_cmd.cmd));
-    }
+    Err(_) => ExecutionOutput::stderr(format!("{}: failed to execute", executable_cmd.cmd)),
   }
 }
 
@@ -256,7 +254,8 @@ fn exec_history(cmd_args: CmdArgs, history: &mut History) -> ExecutionOutput {
     }
     ["history", args @ ..] => {
       // Options (Convert to Options struct if multiple args are accepted)
-      let mut file_path: Option<&str> = None;
+      let mut read_file_path: Option<&str> = None;
+      let mut write_file_path: Option<&str> = None;
 
       let mut iter = args.iter();
       loop {
@@ -270,17 +269,29 @@ fn exec_history(cmd_args: CmdArgs, history: &mut History) -> ExecutionOutput {
         match *arg {
           "-r" => {
             if let Some(path) = iter.next() {
-              file_path = Some(*path);
+              read_file_path = Some(*path);
             } else {
               return ExecutionOutput::stderr("history: expected a file_path value for -r");
+            };
+          }
+          "-w" => {
+            if let Some(path) = iter.next() {
+              write_file_path = Some(*path);
+            } else {
+              return ExecutionOutput::stderr("history: expected a file_path value for -w");
             };
           }
           _ => return ExecutionOutput::stderr("history: invalid args"),
         }
       }
 
-      if let Some(file_path) = file_path {
+      if let Some(file_path) = read_file_path {
         history.extend_from_file(file_path);
+        return ExecutionOutput::none();
+      }
+
+      if let Some(file_path) = write_file_path {
+        history.write_to_file(file_path);
         return ExecutionOutput::none();
       }
 

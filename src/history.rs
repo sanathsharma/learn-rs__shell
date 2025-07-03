@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 
 #[derive(Default)]
 pub struct History {
@@ -23,6 +23,7 @@ impl History {
     self
   }
 
+  // TODO: return a result
   pub fn set_from_file(&mut self, file_path: &str) -> &mut Self {
     let content = load_file(file_path);
     self.stack.clear();
@@ -31,11 +32,35 @@ impl History {
     self
   }
 
+  // TODO: return a result
   pub fn extend_from_file(&mut self, file_path: &str) -> &mut Self {
     let content = load_file(file_path);
     self.stack.extend(content);
 
     self
+  }
+
+  // TODO: return a result
+  pub fn write_to_file(&self, file_path: &str) {
+    let file = OpenOptions::new()
+      .write(true)
+      .create(true)
+      .truncate(true)
+      .open(file_path);
+
+    let mut file = match file {
+      Ok(f) => f,
+      Err(_) => {
+        return ();
+      }
+    };
+
+    let mut output = String::new();
+    for line in self.stack.iter() {
+      output.push_str(format!("{}\n", line).as_str());
+    }
+
+    write!(file, "{}", output).unwrap();
   }
 }
 
