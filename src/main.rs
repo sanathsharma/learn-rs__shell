@@ -20,7 +20,7 @@ mod writer;
 use crate::command::{CmdInput, ExecutionOutput};
 use crate::history::History;
 use crate::input::read_input;
-use crate::tab_completions::setup_completions;
+use crate::tab_completions::setup_cmd_completions;
 use crate::writer::{CmdOutput, CmdOutputWriter, Redirection};
 pub use error::Result;
 
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
 
   loop {
     // Set up command completion for better user experience
-    let mut completions = setup_completions();
+    let mut cmd_completions = setup_cmd_completions();
 
     // Display the shell prompt
     print!("$ ");
@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     // Wait for user input
     // let mut input = String::new();
     // io::stdin().read_line(&mut input)?;
-    let input = match read_input(&mut completions)? {
+    let input = match read_input(&mut cmd_completions, &history)? {
       Some(input) => input,
       None => continue,
     };

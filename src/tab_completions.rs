@@ -1,7 +1,7 @@
 use crate::trie::Trie;
 use crate::utils::find_all_executables;
 
-pub fn setup_completions() -> Trie {
+pub fn setup_cmd_completions() -> Trie {
   let mut completions = Trie::new();
   completions.insert("echo");
   completions.insert("exit");
@@ -15,12 +15,12 @@ pub fn setup_completions() -> Trie {
 }
 
 #[derive(Default, Debug)]
-pub struct TabCompletions {
+pub struct TabCompletionsCtx {
   enabled: bool,
   pub completions: Vec<String>,
 }
 
-impl TabCompletions {
+impl TabCompletionsCtx {
   pub fn new() -> Self {
     Self::default()
   }

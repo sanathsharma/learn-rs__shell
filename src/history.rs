@@ -14,7 +14,34 @@ impl History {
   }
 }
 
-// pub struct HistoryCompletions {
-//   pointer: usize,
-//   completions: Trie,
-// }
+pub struct HistoryNavigation {
+  pointer: usize,
+  size: usize,
+}
+
+impl HistoryNavigation {
+  pub fn from_size(size: usize) -> Self {
+    Self {
+      pointer: size,
+      size,
+    }
+  }
+
+  pub fn next<'a>(&mut self, stack: &'a Vec<String>) -> Option<&'a String> {
+    if self.pointer == self.size {
+      return None;
+    };
+
+    self.pointer += 1;
+
+    stack.get(self.pointer)
+  }
+
+  pub fn previous<'a>(&mut self, stack: &'a Vec<String>) -> Option<&'a String> {
+    if self.pointer != 0 {
+      self.pointer -= 1;
+    }
+
+    stack.get(self.pointer)
+  }
+}
