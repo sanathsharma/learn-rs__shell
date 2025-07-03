@@ -1,3 +1,6 @@
+use std::fs::OpenOptions;
+use std::io::{BufRead, BufReader};
+
 #[derive(Default)]
 pub struct History {
   pub stack: Vec<String>,
@@ -7,8 +10,23 @@ impl History {
   pub fn new() -> Self {
     Self::default()
   }
+
+  pub fn from_file(file_path: &str) -> Self {
+    Self {
+      stack: load_file(file_path),
+    }
+  }
+
   pub fn push(&mut self, command_str: &str) -> &mut Self {
     self.stack.push(command_str.into());
+
+    self
+  }
+
+  pub fn set_from_file(&mut self, file_path: &str) -> &mut Self {
+    let content = load_file(file_path);
+    self.stack.clear();
+    self.stack.extend(content);
 
     self
   }
@@ -44,6 +62,17 @@ impl HistoryNavigation {
 
     stack.get(self.pointer)
   }
+}
+
+fn load_file(file_path: &str) -> Vec<String> {
+  let file = OpenOptions::new().read(true).open(file_path);
+  let file = match file {
+    Ok(f) => f,
+    Err(_) => return Vec::new(),
+  };
+
+  let reader = BufReader::new(file);
+  reader.lines().collect::<Result<Vec<String>, _>>().unwrap()
 }
 
 // TODO:

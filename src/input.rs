@@ -174,3 +174,6 @@ fn disable_raw_mode() -> io::Result<()> {
     .status()?;
   Ok(())
 }
+
+// TODO
+// [] handle edit in-between input with left and right arrow (maintain cursor position, char insertion based on it)

@@ -88,7 +88,7 @@ impl Cmd {
     &self,
     cmd_args: CmdArgs,
     cmd_input: Option<CmdInput>,
-    history: &History,
+    history: &mut History,
   ) -> ExecutionOutput {
     match self {
       Self::Exit => exec_exit(cmd_args),
@@ -237,30 +237,61 @@ fn exec_pwd(cmd_args: CmdArgs) -> ExecutionOutput {
   }
 }
 
-fn exec_history(cmd_args: CmdArgs, history: &History) -> ExecutionOutput {
+fn exec_history(cmd_args: CmdArgs, history: &mut History) -> ExecutionOutput {
   let mut output = String::new();
   let args = cmd_args
     .iter()
     .map(|arg| arg.as_str())
     .collect::<Vec<&str>>();
 
-  let (skip_count, iter) = match args.as_slice() {
-    ["history"] => (0, history.stack.iter()),
+  let skip_count = match args.as_slice() {
+    ["history"] => 0,
     ["history", count] => {
       let count = match count.parse::<usize>() {
         Ok(count) => count,
         Err(_) => return ExecutionOutput::stderr("history: invalid history count"),
       };
 
-      let start_index = history.stack.len() - count;
-      (start_index, history.stack[start_index..].into_iter())
+      history.stack.len() - count
+    }
+    ["history", args @ ..] => {
+      // Options (Convert to Options struct if multiple args are accepted)
+      let mut file_path: Option<&str> = None;
+
+      let mut iter = args.iter();
+      loop {
+        let arg = match iter.next() {
+          Some(arg) => arg,
+          None => {
+            break;
+          }
+        };
+
+        match *arg {
+          "-r" => {
+            if let Some(path) = iter.next() {
+              file_path = Some(*path);
+            } else {
+              return ExecutionOutput::stderr("history: expected a file_path value for -r");
+            };
+          }
+          _ => return ExecutionOutput::stderr("history: invalid args"),
+        }
+      }
+
+      if let Some(file_path) = file_path {
+        history.set_from_file(file_path);
+        return ExecutionOutput::none();
+      }
+
+      return ExecutionOutput::none();
     }
     _ => {
-      return ExecutionOutput::stderr("history: expected 1 arg at most");
+      return ExecutionOutput::stderr("history: invalid args");
     }
   };
 
-  for (index, item) in iter.enumerate() {
+  for (index, item) in history.stack.iter().skip(skip_count).enumerate() {
     output.push_str(format!("   {} {}\n", skip_count + index + 1, item).as_str());
   }
 

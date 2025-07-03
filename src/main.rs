@@ -80,7 +80,7 @@ fn main() -> Result<()> {
           println!("{}: command not found", input.trim());
           ExecutionOutput::none()
         }
-        command => command.exec(cmd_args.to_vec(), piped_stdin.take(), &history),
+        command => command.exec(cmd_args.to_vec(), piped_stdin.take(), &mut history),
       };
 
       // Handle the command output based on redirection and piping
