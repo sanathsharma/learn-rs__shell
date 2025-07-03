@@ -1,12 +1,7 @@
 use std::io::{BufReader, Read};
 use std::process::Child;
 use std::sync::Arc;
-use std::{
-  fs::OpenOptions,
-  io,
-  io::Write,
-  thread,
-};
+use std::{fs::OpenOptions, io, io::Write, thread};
 
 #[derive(Debug)]
 pub enum CmdOutput {
@@ -181,11 +176,7 @@ impl CmdOutputWriter {
   fn create_redirection_file(&self) {
     match self.redirection.clone() {
       Redirection::Stdout { file_path, .. } | Redirection::Stderr { file_path, .. } => {
-        let file  = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(&file_path);
-
+        let file = OpenOptions::new().create(true).write(true).open(&file_path);
 
         if let Err(err) = file {
           eprintln!("Error opening file {}: {}", file_path, err);

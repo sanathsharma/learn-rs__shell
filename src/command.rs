@@ -9,6 +9,7 @@ use std::{
   io::{self},
   process::{self, Stdio},
 };
+use crate::history::History;
 
 pub struct ExecutableCmd {
   cmd: String,
@@ -83,15 +84,15 @@ impl ExecutionOutput {
 }
 
 impl Cmd {
-  pub fn exec(&self, cmd_args: CmdArgs, input: Option<CmdInput>) -> ExecutionOutput {
+  pub fn exec(&self, cmd_args: CmdArgs, cmd_input: Option<CmdInput>, history: &History) -> ExecutionOutput {
     match self {
       Self::Exit => exec_exit(cmd_args),
       Self::Echo => exec_echo(cmd_args),
       Self::Type => exec_type(cmd_args),
-      Self::Executable(cmd) => exec_executable(cmd, cmd_args, input),
+      Self::Executable(cmd) => exec_executable(cmd, cmd_args, cmd_input),
       Self::Cd => exec_cd(cmd_args),
       Self::Pwd => exec_pwd(cmd_args),
-      Self::History => exec_history(cmd_args),
+      Self::History => exec_history(history),
       Self::Unknown => ExecutionOutput::none(),
     }
   }
@@ -231,6 +232,12 @@ fn exec_pwd(cmd_args: CmdArgs) -> ExecutionOutput {
   }
 }
 
-fn exec_history(_cmd_args: CmdArgs) -> ExecutionOutput {
-  ExecutionOutput::none()
+fn exec_history(history: &History) -> ExecutionOutput {
+  let mut output = String::new();
+
+  for (index, item) in history.stack.iter().enumerate() {
+    output.push_str(format!("   {} {}\n", index + 1, item).as_str());
+  }
+
+  ExecutionOutput::stdout(output)
 }

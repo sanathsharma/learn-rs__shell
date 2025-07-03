@@ -10,17 +10,19 @@ mod ansi_codes;
 mod args;
 mod command;
 mod error;
+mod history;
+mod input;
+mod tab_completions;
 mod trie;
 mod utils;
 mod writer;
-mod tab_completions;
-mod input;
 
 use crate::command::{CmdInput, ExecutionOutput};
-use crate::writer::{CmdOutput, CmdOutputWriter, Redirection};
-pub use error::Result;
 use crate::input::read_input;
 use crate::tab_completions::setup_completions;
+use crate::writer::{CmdOutput, CmdOutputWriter, Redirection};
+pub use error::Result;
+use crate::history::History;
 
 /// Main entry point for the shell implementation.
 ///
@@ -33,6 +35,8 @@ use crate::tab_completions::setup_completions;
 /// The shell runs in an infinite loop, continuously prompting for and processing user input
 /// until explicitly terminated (e.g., with the "exit" command).
 fn main() -> Result<()> {
+  let mut history = History::new();
+
   loop {
     // Set up command completion for better user experience
     let mut completions = setup_completions();
@@ -49,6 +53,9 @@ fn main() -> Result<()> {
       Some(input) => input,
       None => continue,
     };
+
+    // Push new command input into history stack
+    history.push(&input);
 
     // Skip empty input lines
     if input.trim().is_empty() {
@@ -73,7 +80,7 @@ fn main() -> Result<()> {
           println!("{}: command not found", input.trim());
           ExecutionOutput::none()
         }
-        command => command.exec(cmd_args.to_vec(), piped_stdin.take()),
+        command => command.exec(cmd_args.to_vec(), piped_stdin.take(), &history),
       };
 
       // Handle the command output based on redirection and piping
