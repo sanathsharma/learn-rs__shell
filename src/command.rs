@@ -1,3 +1,4 @@
+use crate::history::History;
 use crate::writer::CmdOutput;
 use crate::{
   args::CmdArgs,
@@ -9,7 +10,6 @@ use std::{
   io::{self},
   process::{self, Stdio},
 };
-use crate::history::History;
 
 pub struct ExecutableCmd {
   cmd: String,
@@ -84,7 +84,12 @@ impl ExecutionOutput {
 }
 
 impl Cmd {
-  pub fn exec(&self, cmd_args: CmdArgs, cmd_input: Option<CmdInput>, history: &History) -> ExecutionOutput {
+  pub fn exec(
+    &self,
+    cmd_args: CmdArgs,
+    cmd_input: Option<CmdInput>,
+    history: &History,
+  ) -> ExecutionOutput {
     match self {
       Self::Exit => exec_exit(cmd_args),
       Self::Echo => exec_echo(cmd_args),
@@ -92,7 +97,7 @@ impl Cmd {
       Self::Executable(cmd) => exec_executable(cmd, cmd_args, cmd_input),
       Self::Cd => exec_cd(cmd_args),
       Self::Pwd => exec_pwd(cmd_args),
-      Self::History => exec_history(history),
+      Self::History => exec_history(cmd_args, history),
       Self::Unknown => ExecutionOutput::none(),
     }
   }
@@ -232,11 +237,31 @@ fn exec_pwd(cmd_args: CmdArgs) -> ExecutionOutput {
   }
 }
 
-fn exec_history(history: &History) -> ExecutionOutput {
+fn exec_history(cmd_args: CmdArgs, history: &History) -> ExecutionOutput {
   let mut output = String::new();
+  let args = cmd_args
+    .iter()
+    .map(|arg| arg.as_str())
+    .collect::<Vec<&str>>();
 
-  for (index, item) in history.stack.iter().enumerate() {
-    output.push_str(format!("   {} {}\n", index + 1, item).as_str());
+  let (skip_count, iter) = match args.as_slice() {
+    ["history"] => (0, history.stack.iter()),
+    ["history", count] => {
+      let count = match count.parse::<usize>() {
+        Ok(count) => count,
+        Err(_) => return ExecutionOutput::stderr("history: invalid history count"),
+      };
+
+      let start_index = history.stack.len() - count;
+      (start_index, history.stack[start_index..].into_iter())
+    }
+    _ => {
+      return ExecutionOutput::stderr("history: expected 1 arg at most");
+    }
+  };
+
+  for (index, item) in iter.enumerate() {
+    output.push_str(format!("   {} {}\n", skip_count + index + 1, item).as_str());
   }
 
   ExecutionOutput::stdout(output)

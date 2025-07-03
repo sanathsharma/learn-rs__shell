@@ -18,11 +18,11 @@ mod utils;
 mod writer;
 
 use crate::command::{CmdInput, ExecutionOutput};
+use crate::history::History;
 use crate::input::read_input;
 use crate::tab_completions::setup_completions;
 use crate::writer::{CmdOutput, CmdOutputWriter, Redirection};
 pub use error::Result;
-use crate::history::History;
 
 /// Main entry point for the shell implementation.
 ///

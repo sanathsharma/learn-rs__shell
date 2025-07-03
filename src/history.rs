@@ -4,7 +4,7 @@ pub struct History {
 }
 
 impl History {
-  pub fn new () -> Self {
+  pub fn new() -> Self {
     Self::default()
   }
   pub fn push(&mut self, command_str: &str) -> &mut Self {
