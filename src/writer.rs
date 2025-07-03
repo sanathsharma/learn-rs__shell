@@ -1,11 +1,10 @@
 use std::io::{BufReader, Read};
 use std::process::Child;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{
   fs::OpenOptions,
   io,
-  io::{Seek, SeekFrom, Write},
+  io::Write,
   thread,
 };
 
@@ -224,7 +223,7 @@ impl CmdOutputWriter {
           let writer_stdout = Arc::clone(&writer);
           let writer_stderr = Arc::clone(&writer);
 
-          let stdout_handle = thread::spawn(move || {
+          let _stdout_handle = thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
             let mut buf = [0u8; 4096];
             loop {
@@ -242,7 +241,7 @@ impl CmdOutputWriter {
             }
           });
 
-          let stderr_handle = thread::spawn(move || {
+          let _stderr_handle = thread::spawn(move || {
             let mut reader = BufReader::new(stderr);
             let mut buf = [0u8; 4096];
             loop {
