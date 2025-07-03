@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 // Bash impl docs, see https://www.gnu.org/software/bash/manual/bash.html#Redirecting-Output
 
+use std::env;
 use args::parse_args;
 use command::Cmd;
 use std::io::{self, Write};
@@ -36,6 +37,10 @@ pub use error::Result;
 /// until explicitly terminated (e.g., with the "exit" command).
 fn main() -> Result<()> {
   let mut history = History::new();
+
+  if let Ok(histfile) = env::var("HISTFILE") {
+    history.set_from_file(&histfile);
+  }
 
   loop {
     // Set up command completion for better user experience
