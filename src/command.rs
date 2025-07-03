@@ -280,7 +280,7 @@ fn exec_history(cmd_args: CmdArgs, history: &mut History) -> ExecutionOutput {
       }
 
       if let Some(file_path) = file_path {
-        history.set_from_file(file_path);
+        history.extend_from_file(file_path);
         return ExecutionOutput::none();
       }
 

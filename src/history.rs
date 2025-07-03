@@ -30,6 +30,13 @@ impl History {
 
     self
   }
+
+  pub fn extend_from_file(&mut self, file_path: &str) -> &mut Self {
+    let content = load_file(file_path);
+    self.stack.extend(content);
+
+    self
+  }
 }
 
 pub struct HistoryNavigation {
