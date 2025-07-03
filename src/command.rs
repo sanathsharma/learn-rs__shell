@@ -91,7 +91,7 @@ impl Cmd {
     history: &mut History,
   ) -> ExecutionOutput {
     match self {
-      Self::Exit => exec_exit(cmd_args),
+      Self::Exit => exec_exit(cmd_args, history),
       Self::Echo => exec_echo(cmd_args),
       Self::Type => exec_type(cmd_args),
       Self::Executable(cmd) => exec_executable(cmd, cmd_args, cmd_input),
@@ -103,16 +103,26 @@ impl Cmd {
   }
 }
 
-fn exec_exit(cmd_args: CmdArgs) -> ExecutionOutput {
+fn exec_exit(cmd_args: CmdArgs, history: &mut History) -> ExecutionOutput {
   let args = cmd_args
     .iter()
     .map(|arg| arg.as_str())
     .collect::<Vec<&str>>();
 
+  let mut write_history = || {
+    if let Ok(histfile) = env::var("HISTFILE") {
+      history.write_to_file(&histfile, true);
+    }
+  };
+
   match args.as_slice() {
-    ["exit"] => process::exit(255),
+    ["exit"] => {
+      write_history();
+      process::exit(255)
+    }
     ["exit", code] => {
       if let Ok(code) = code.parse::<u8>() {
+        write_history();
         process::exit(code.into());
       }
 

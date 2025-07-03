@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 // Bash impl docs, see https://www.gnu.org/software/bash/manual/bash.html#Redirecting-Output
 
-use std::env;
 use args::parse_args;
 use command::Cmd;
+use std::env;
 use std::io::{self, Write};
 use std::process::Stdio;
 
